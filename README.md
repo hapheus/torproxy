@@ -1,6 +1,6 @@
 # torproxy
 
-A small Docker image that provides an HTTP proxy on port `8118` and sends its traffic through Tor. It also offers a small local API on port `8080` to view and control the connection.
+A small Docker image that provides an HTTP proxy on port `8118` and a SOCKS5 proxy on port `9050`, both routed through Tor. It also offers a small local API on port `8080` to view and control the connection.
 
 ## Why use Tor?
 
@@ -13,9 +13,10 @@ Tor sends requests through several independent servers before they reach their d
 ```sh
 docker compose up -d
 curl -v -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
+curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
 ```
 
-Compose makes both ports available only on this computer (`127.0.0.1`). This is intentional: neither the proxy nor the control API has a password.
+Compose makes all ports available only on this computer (`127.0.0.1`). This is intentional: neither proxy nor the control API has a password.
 
 ## Usage
 
@@ -27,12 +28,19 @@ Configure software that supports an HTTP proxy with:
 | Port | `8118` |
 | Scheme | `http` |
 
+For SOCKS5-aware software, use `127.0.0.1:9050`. The SOCKS5 port resolves host names through Tor; with curl, use `--socks5-hostname`:
+
+```sh
+curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+```
+
 For a direct Docker run:
 
 ```sh
 docker run -d --name torproxy --restart unless-stopped \
   -p 127.0.0.1:8118:8118 \
   -p 127.0.0.1:8080:8080 \
+  -p 127.0.0.1:9050:9050 \
   hapheus/torproxy:latest
 ```
 
@@ -95,6 +103,7 @@ TORPROXY_HOST_PORT=8118
 TORPROXY_LISTEN_ADDRESS=0.0.0.0
 TORPROXY_LISTEN_PORT=8118
 TORPROXY_API_PORT=8080
+TORPROXY_SOCKS_PORT=9050
 ```
 
 | Variable | Default | Purpose |
@@ -103,16 +112,17 @@ TORPROXY_API_PORT=8080
 | `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Address the proxy uses inside its container. Usually leave this unchanged. |
 | `TORPROXY_LISTEN_PORT` | `8118` | Proxy port inside the container. Usually leave this unchanged. |
 | `TORPROXY_API_PORT` | `8080` | Port for the status and control API. |
+| `TORPROXY_SOCKS_PORT` | `9050` | Port on your computer and inside the container for Tor's SOCKS5 proxy. |
 
-The settings are checked when the container starts. Tor's own internal ports are private to the container and are never exposed.
+The settings are checked when the container starts. The SOCKS5 port is published only on `127.0.0.1`, so it is not accessible from outside the host. Other containers on the same Docker network can also reach it at `torproxy:9050`.
 
 ## Safety
 
 This project is deliberately small: it has no user accounts, password protection, or saved state. Its local API can connect, disconnect, and renew the Tor connection.
 
-Do not expose ports `8118` or `8080` to the internet. Anyone who can reach the proxy can use it, and anyone who can reach the API can control its connection.
+Do not expose ports `8118`, `9050`, or `8080` to the internet. Anyone who can reach either proxy can use it, and anyone who can reach the API can control its connection.
 
-The proxy is configured to send all requests through Tor. Tor's internal services stay private inside the container.
+Both proxy endpoints send traffic through Tor. Although the SOCKS5 listener binds to the container network so Docker can forward it, Compose publishes it only on the host loopback interface.
 
 ## License
 

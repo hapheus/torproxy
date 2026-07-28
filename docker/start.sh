@@ -18,6 +18,12 @@ validate_configuration() {
     echo "TORPROXY_API_PORT must be an integer between 1 and 65535." >&2
     exit 1
   fi
+
+  if [[ ! "$TORPROXY_SOCKS_PORT" =~ ^[0-9]+$ ]] \
+    || (( TORPROXY_SOCKS_PORT < 1 || TORPROXY_SOCKS_PORT > 65535 )); then
+    echo "TORPROXY_SOCKS_PORT must be an integer between 1 and 65535." >&2
+    exit 1
+  fi
 }
 
 shutdown() {
@@ -33,7 +39,11 @@ sed \
   -e "s|__TORPROXY_LISTEN_PORT__|$TORPROXY_LISTEN_PORT|" \
   /etc/privoxy/config.template > /tmp/privoxy.config
 
-tor -f /etc/tor/torrc &
+sed \
+  -e "s|__TORPROXY_SOCKS_PORT__|$TORPROXY_SOCKS_PORT|" \
+  /etc/tor/torrc > /tmp/torrc
+
+tor -f /tmp/torrc &
 tor_pid=$!
 
 privoxy --no-daemon /tmp/privoxy.config &
