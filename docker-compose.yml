@@ -1,0 +1,11 @@
+services:
+  torproxy:
+    image: hapheus/torproxy:latest
+    build:
+      context: ./docker
+    environment:
+      TORPROXY_LISTEN_ADDRESS: ${TORPROXY_LISTEN_ADDRESS:-0.0.0.0}
+      TORPROXY_LISTEN_PORT: ${TORPROXY_LISTEN_PORT:-8118}
+    ports:
+      - "127.0.0.1:${TORPROXY_HOST_PORT:-8118}:${TORPROXY_LISTEN_PORT:-8118}"
+    restart: unless-stopped

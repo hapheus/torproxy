@@ -1,0 +1,5 @@
+# The values are rendered from validated runtime environment variables.
+listen-address  __TORPROXY_LISTEN_ADDRESS__:__TORPROXY_LISTEN_PORT__
+
+# Send every request through Tor. The trailing dot enables remote DNS lookups.
+forward-socks5t / 127.0.0.1:9050 .
