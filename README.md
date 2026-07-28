@@ -6,7 +6,7 @@ A small, non-root Docker image that exposes an HTTP proxy on port `8118` and rou
 
 ```sh
 docker compose up -d
-curl --proxy http://127.0.0.1:8118 https://check.torproject.org/api/ip
+curl -v -x 127.0.0.1:8118 https://check.torproject.org/api/ip
 ```
 
 The Compose file binds the proxy to `127.0.0.1` only. This is intentional: an unauthenticated proxy must not be exposed to untrusted networks. The published image is [`hapheus/torproxy`](https://hub.docker.com/r/hapheus/torproxy).
@@ -24,7 +24,16 @@ Configure software that supports an HTTP proxy with:
 For a direct Docker run:
 
 ```sh
-docker run -d --name torproxy --restart unless-stopped -p 127.0.0.1:8118:8118 hapheus/torproxy:latest
+docker run -d --name torproxy --restart unless-stopped -p 127.0.0.1:8118:8118 -p 127.0.0.1:8080:8080 hapheus/torproxy:latest
+```
+
+### From other Docker containers
+
+If you run other containers within the same Docker network, you can route their traffic through the proxy using `torproxy:8118` (using the container name as the hostname).
+
+Example in a shared network:
+```sh
+curl -v -x http://torproxy:8118 https://check.torproject.org/api/ip
 ```
 
 ## Health check
@@ -36,6 +45,38 @@ Inspect it with:
 ```sh
 docker inspect --format '{{.State.Health.Status}}' torproxy
 ```
+
+## RESTful Control API
+
+The container runs a minimalist RESTful Control API on port `8080` (bound to `127.0.0.1` by default) to monitor and control the proxy state:
+
+| Endpoint | Method | Response | Purpose |
+| --- | --- | --- | --- |
+| `/status` or `/` | `GET`/`POST` | JSON | Returns the current state (`connected`, `disconnected`, `connecting`), current Tor exit IP, and network status. |
+| `/ip` | `GET` | JSON | Returns the current Tor exit IP. |
+| `/connect` | `GET`/`POST` | JSON | Enables the Tor network connection. |
+| `/disconnect` | `GET`/`POST` | JSON | Disables the Tor network connection (blocks traffic). |
+| `/reconnect` | `GET`/`POST` | JSON | Triggers Tor's circuit rotation (`NEWNYM` signal) to get a new IP. |
+
+### Examples:
+
+- **Check status:**
+  ```sh
+  curl http://127.0.0.1:8080/status
+  ```
+  Response: `{"status": "connected", "ip": "185.220.101.5", "network": "enabled"}`
+
+- **Rotate IP (reconnect):**
+  ```sh
+  curl http://127.0.0.1:8080/reconnect
+  ```
+  Response: `{"action": "reconnect", "status": "success"}`
+
+- **Disconnect from Tor network:**
+  ```sh
+  curl http://127.0.0.1:8080/disconnect
+  ```
+  Response: `{"action": "disconnect", "status": "success"}`
 
 ## Configuration
 

@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.url="https://github.com/hapheus/torproxy"
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl privoxy tini tor \
+    && apt-get install --no-install-recommends -y ca-certificates curl privoxy tini tor python3 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --home-dir /var/lib/tor --shell /usr/sbin/nologin torproxy \
     && install -d -m 0700 -o torproxy -g torproxy /var/lib/tor \
@@ -15,15 +15,17 @@ RUN apt-get update \
 
 COPY --chmod=755 start.sh /usr/local/bin/start.sh
 COPY --chmod=755 healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY --chmod=755 api.py /usr/local/bin/api.py
 COPY privoxy.config.template /etc/privoxy/config.template
 COPY torrc /etc/tor/torrc
 
 USER torproxy
 
 ENV TORPROXY_LISTEN_ADDRESS=0.0.0.0 \
-    TORPROXY_LISTEN_PORT=8118
+    TORPROXY_LISTEN_PORT=8118 \
+    TORPROXY_API_PORT=8080
 
-EXPOSE 8118
+EXPOSE 8118 8080
 
 HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
   CMD ["/usr/local/bin/healthcheck.sh"]

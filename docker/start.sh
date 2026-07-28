@@ -12,11 +12,17 @@ validate_configuration() {
     echo "TORPROXY_LISTEN_PORT must be an integer between 1 and 65535." >&2
     exit 1
   fi
+
+  if [[ ! "$TORPROXY_API_PORT" =~ ^[0-9]+$ ]] \
+    || (( TORPROXY_API_PORT < 1 || TORPROXY_API_PORT > 65535 )); then
+    echo "TORPROXY_API_PORT must be an integer between 1 and 65535." >&2
+    exit 1
+  fi
 }
 
 shutdown() {
-  kill -TERM "${tor_pid:-}" "${privoxy_pid:-}" 2>/dev/null || true
-  wait "${tor_pid:-}" "${privoxy_pid:-}" 2>/dev/null || true
+  kill -TERM "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" 2>/dev/null || true
+  wait "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" 2>/dev/null || true
 }
 
 trap shutdown EXIT
@@ -33,6 +39,9 @@ tor_pid=$!
 privoxy --no-daemon /tmp/privoxy.config &
 privoxy_pid=$!
 
-# Exit as soon as either critical process exits. tini forwards signals and
+python3 /usr/local/bin/api.py &
+api_pid=$!
+
+# Exit as soon as any critical process exits. tini forwards signals and
 # terminates the remaining process group during container shutdown.
-wait -n "$tor_pid" "$privoxy_pid"
+wait -n "$tor_pid" "$privoxy_pid" "$api_pid"

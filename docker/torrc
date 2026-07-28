@@ -1,4 +1,8 @@
 # Keep Tor's SOCKS listener private to the container.
 SocksPort 127.0.0.1:9050
+ControlPort 127.0.0.1:9051
+CookieAuthentication 0
 DataDirectory /var/lib/tor
 RunAsDaemon 0
+AvoidDiskWrites 1
+ClientOnly 1
