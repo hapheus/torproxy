@@ -1,6 +1,18 @@
-# torproxy
+# torproxy — Minimal Tor HTTP & SOCKS5 Proxy for Docker
 
-A small Docker image that provides an HTTP proxy on port `8118` and a SOCKS5 proxy on port `9050`, both routed through Tor. It also offers a small local API on port `8080` to view and control the connection.
+A minimal Tor HTTP and SOCKS5 proxy for Docker. torproxy routes proxy traffic through the Tor network, works with sensible defaults, and includes a local REST API and Docker health check for reliable automation. The HTTP proxy listens on port `8118`, SOCKS5 on port `9050`, and the API on port `8080`.
+
+## Simple, secure Tor for Docker
+
+torproxy is deliberately focused: provide an HTTP proxy that routes traffic through Tor, without a large configuration surface or complex startup parameters. It is designed for Docker users who want a dependable service that is easy to run, automate, and monitor.
+
+- **Minimal setup:** start it with Docker Compose or one `docker run` command.
+- **Ready-aware health check:** the container is healthy only when Tor is connected and the proxy is usable.
+- **Small REST API:** check the connection and connect, disconnect, or request a new circuit without using the Tor Control Protocol directly.
+- **Safe local defaults:** proxy and API bind to localhost by default; Tor's internal services remain private inside the container.
+- **Docker-native operation:** simple networking, restart policy support, and no unnecessary configuration.
+
+The result is a small Docker Tor proxy that fits cleanly into scripts, CI/CD jobs, monitoring, Home Assistant, n8n, and Docker Compose stacks.
 
 ## Why use Tor?
 
@@ -52,9 +64,33 @@ Containers in the same Docker network can use `torproxy:8118` as their proxy. Th
 curl -v -x http://torproxy:8118 https://check.torproject.org/api/ip
 ```
 
+## Automate privacy-aware workflows
+
+The REST API exists so applications do not need to speak the Tor Control Protocol or manage Tor processes themselves. A workflow can ask whether the proxy is ready, pause Tor traffic when it should not run, resume it when work starts, or request a fresh Tor circuit between independent jobs.
+
+This is useful for authorised web-data collection, scheduled integrations, and automation where the application should use a Tor exit IP instead of exposing the network's normal public IP. Always respect the target site's terms, robots guidance, rate limits, and applicable law.
+
+For example, an n8n workflow can use ordinary **HTTP Request** nodes to call the local API:
+
+1. `GET http://torproxy:8080/status` — continue only when the status is `connected`.
+2. Run the task through the HTTP proxy at `http://torproxy:8118`.
+3. `POST http://torproxy:8080/reconnect` — optionally request a new circuit before a separate, authorised job.
+
+The same pattern works in shell scripts, CI/CD pipelines, health monitoring, and any service that can make HTTP requests. A reconnect is a request to Tor, not a guarantee of a different IP address.
+
 ## Is it ready?
 
 The image reports `healthy` only after Tor is connected and the proxy can be used. Starting the container is quick, but establishing a Tor connection can take a little longer.
+
+That distinction lets dependent services wait for a usable proxy instead of merely a running container:
+
+```yaml
+services:
+  app:
+    depends_on:
+      torproxy:
+        condition: service_healthy
+```
 
 With Compose, inspect the health state with:
 
@@ -68,9 +104,9 @@ For the direct `docker run` example, use:
 docker inspect --format '{{.State.Health.Status}}' torproxy
 ```
 
-## Status and control API
+## REST API for Tor status and connection control
 
-The container includes a small JSON API. With Compose, it is available on this computer at `http://127.0.0.1:8080`. Containers in the same Docker network can access it too. It has no password, so do not make it publicly available.
+The container includes a small JSON REST API for automation and monitoring. With Compose, it is available on this computer at `http://127.0.0.1:8080`. Containers in the same Docker network can access it too. It has no password, so do not make it publicly available.
 
 | Method | Endpoint                                         | Short description | Example response |
 | --- |--------------------------------------------------| --- | --- |
