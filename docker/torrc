@@ -1,5 +1,6 @@
-# Keep Tor's SOCKS listener private to the container.
-SocksPort 127.0.0.1:9050
+# Docker publishes this listener only on the host's loopback interface.
+# Binding to all container interfaces is required for Docker port forwarding.
+SocksPort 0.0.0.0:__TORPROXY_SOCKS_PORT__
 ControlPort 127.0.0.1:9051
 CookieAuthentication 0
 DataDirectory /var/lib/tor
