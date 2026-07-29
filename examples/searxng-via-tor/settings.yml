@@ -1,0 +1,22 @@
+use_default_settings: true
+
+general:
+  instance_name: "SearXNG through Tor"
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  limiter: false
+  image_proxy: true
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 20.0
+  proxies:
+    all://:
+      - http://torproxy:8118
+  using_tor_proxy: true
+  extra_proxy_timeout: 10
