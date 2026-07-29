@@ -1,0 +1,27 @@
+services:
+  torproxy:
+    image: hapheus/torproxy:latest
+    environment:
+      TORPROXY_LISTEN_ADDRESS: 0.0.0.0
+      TORPROXY_LISTEN_PORT: 8118
+      TORPROXY_API_PORT: 8080
+      TORPROXY_SOCKS_PORT: 9050
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    depends_on:
+      torproxy:
+        condition: service_healthy
+    environment:
+      - HOST=0.0.0.0
+      - TOKEN=${BROWSERLESS_TOKEN:-local-demo-token}
+      - CONCURRENT=1
+      - QUEUED=1
+      - DEFAULT_LAUNCH_ARGS=["--proxy-server=http://torproxy:8118"]
+    ports:
+      - "127.0.0.1:${BROWSERLESS_PORT:-3000}:3000"
+    shm_size: 2gb
+    restart: unless-stopped
