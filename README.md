@@ -80,7 +80,7 @@ The same pattern works in shell scripts, CI/CD pipelines, health monitoring, and
 
 ## Is it ready?
 
-The image reports `healthy` only after Tor is connected and the proxy can be used. Starting the container is quick, but establishing a Tor connection can take a little longer.
+The image reports `healthy` only after Tor is connected and the proxy can be used. Starting the container is quick, but establishing a Tor connection can take a little longer. The health check `start-period` is 180 seconds so a slow Tor bootstrap is not treated as a failed container.
 
 That distinction lets dependent services wait for a usable proxy instead of merely a running container:
 
