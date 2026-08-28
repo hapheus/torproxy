@@ -28,7 +28,7 @@ ENV TORPROXY_LISTEN_ADDRESS=0.0.0.0 \
 
 EXPOSE 8118 8080 9050
 
-HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=3 \
   CMD ["/usr/local/bin/healthcheck.sh"]
 
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/start.sh"]
