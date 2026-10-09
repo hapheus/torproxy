@@ -101,7 +101,7 @@ jobs:
 
       - name: Verify Daemon Processes
         run: |
-          PROCS=$(docker exec torproxy-smoke ps aux)
+          PROCS=$(docker top torproxy-smoke)
           echo "$PROCS"
           echo "$PROCS" | grep -q "tor" || (echo "❌ tor daemon is not running" && exit 1)
           echo "$PROCS" | grep -q "privoxy" || (echo "❌ privoxy is not running" && exit 1)
