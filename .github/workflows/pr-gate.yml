@@ -74,7 +74,14 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t torproxy:smoke-test ./docker
+          for i in {1..5}; do
+            echo "Attempt $i: Building Docker image..."
+            if docker build -t torproxy:smoke-test ./docker; then
+              break
+            fi
+            echo "Build failed (possibly Docker Hub rate limit 429). Retrying in 10s..."
+            sleep 10
+          done
 
       - name: Run Container for Smoke Test
         id: run-container
