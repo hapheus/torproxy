@@ -1,0 +1,34 @@
+[project]
+name = "torproxy"
+version = "1.0.1"
+description = "A minimal HTTP and SOCKS5 proxy routed through the Tor network with local REST control API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Franz Haberfellner" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Hermetic unit tests without external network or daemon requirements",
+    "smoke: Container smoke and lifecycle tests",
+    "live: Live canary tests against the active Tor network",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

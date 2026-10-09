@@ -1,0 +1,128 @@
+name: "PR Quality & Smoke Gate"
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-validate:
+    name: "Lint & Static Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Linting Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff Linter
+        run: |
+          ruff check .
+
+      - name: Validate Shell Script Syntax
+        run: |
+          bash -n docker/start.sh
+          bash -n docker/healthcheck.sh
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck docker/start.sh
+          shellcheck docker/healthcheck.sh
+
+  unit-tests:
+    name: "Hermetic Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run Pytest (Hermetic Unit Tests)
+        run: |
+          pytest tests/unit/ -v
+
+  docker-smoke:
+    name: "Docker Build & Container Smoke Test"
+    runs-on: ubuntu-latest
+    needs: [lint-and-validate, unit-tests]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: |
+          docker build -t torproxy:smoke-test ./docker
+
+      - name: Run Container for Smoke Test
+        id: run-container
+        run: |
+          CONTAINER_ID=$(docker run -d \
+            --name torproxy-smoke \
+            -p 8118:8118 \
+            -p 9050:9050 \
+            -p 8080:8080 \
+            torproxy:smoke-test)
+          echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"
+          # Brief sleep to allow processes to start
+          sleep 3
+
+      - name: Verify Non-Root User Execution
+        run: |
+          CONTAINER_UID=$(docker exec torproxy-smoke id -u)
+          echo "Container User UID: $CONTAINER_UID"
+          if [ "$CONTAINER_UID" -eq 0 ]; then
+            echo "❌ CRITICAL SECURITY ERROR: Container is running as root (UID 0)!"
+            exit 1
+          fi
+          echo "✅ Container is running as non-root user (UID: $CONTAINER_UID)."
+
+      - name: Verify Daemon Processes
+        run: |
+          PROCS=$(docker exec torproxy-smoke ps aux)
+          echo "$PROCS"
+          echo "$PROCS" | grep -q "tor" || (echo "❌ tor daemon is not running" && exit 1)
+          echo "$PROCS" | grep -q "privoxy" || (echo "❌ privoxy is not running" && exit 1)
+          echo "$PROCS" | grep -q "python3" || (echo "❌ API process is not running" && exit 1)
+          echo "✅ All required daemons (tor, privoxy, api.py) are running."
+
+      - name: Verify Graceful Shutdown
+        run: |
+          echo "Stopping container with 5s timeout to test SIGTERM handling..."
+          STOP_START=$(date +%s)
+          docker stop -t 5 torproxy-smoke
+          STOP_END=$(date +%s)
+          STOP_DURATION=$((STOP_END - STOP_START))
+          echo "Container stopped in $STOP_DURATION seconds."
+          if [ "$STOP_DURATION" -ge 10 ]; then
+            echo "❌ Container failed graceful shutdown within timeout (was SIGKILLed)."
+            exit 1
+          fi
+          echo "✅ Graceful shutdown successful."
+
+      - name: Cleanup Smoke Container
+        if: always()
+        run: |
+          docker rm -f torproxy-smoke || true
