@@ -1,0 +1,236 @@
+name: "Daily Live Image Verification"
+
+on:
+  schedule:
+    # Daily at 04:00 UTC (before European business hours start)
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker Image Tag to test (default: latest)"
+        required: true
+        default: "latest"
+
+jobs:
+  verify-live-image:
+    name: "Live Tor Canary Verification"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------------
+      # 1. Determine Host IP (for anti-leak assertion)
+      # -------------------------------------------------------------
+      - name: Determine Host IP
+        id: host-info
+        run: |
+          RUNNER_IP=$(curl -s --connect-timeout 10 https://api.ipify.org || curl -s --connect-timeout 10 https://icanhazip.com)
+          echo "Host Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------
+      # 2. Pull and start current Docker image
+      # -------------------------------------------------------------
+      - name: Pull and Run torproxy Container
+        id: run-container
+        run: |
+          IMAGE_TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          IMAGE_NAME="hapheus/torproxy:${IMAGE_TAG}"
+          echo "Pulling Docker Image: $IMAGE_NAME..."
+          docker pull "$IMAGE_NAME"
+          
+          echo "Starting Container..."
+          CONTAINER_ID=$(docker run -d \
+            --name torproxy-canary \
+            -p 8118:8118 \
+            -p 9050:9050 \
+            -p 8080:8080 \
+            "$IMAGE_NAME")
+          echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------
+      # 3. Live check: wait for 100% Tor bootstrap (SLA: max 180s)
+      # -------------------------------------------------------------
+      - name: Wait for Tor 100% Bootstrap
+        timeout-minutes: 4
+        run: |
+          echo "Waiting for Tor Bootstrap via REST API (http://localhost:8080/status)..."
+          BOOTSTRAPPED=false
+          for i in {1..36}; do
+            STATUS_JSON=$(curl -s --connect-timeout 5 http://localhost:8080/status || echo "{}")
+            STATUS=$(echo "$STATUS_JSON" | jq -r '.status // "unknown"')
+            DETAIL=$(echo "$STATUS_JSON" | jq -r '.detail // ""')
+            
+            echo "Attempt $i/36: Status='$STATUS', Detail='$DETAIL'"
+            
+            if [ "$STATUS" = "connected" ]; then
+              echo "✅ Tor successfully bootstrapped and connected!"
+              BOOTSTRAPPED=true
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$BOOTSTRAPPED" != "true" ]; then
+            echo "❌ ERROR: Tor failed to reach 100% bootstrap within 180 seconds."
+            echo "=== Container Logs ==="
+            docker logs torproxy-canary
+            exit 1
+          fi
+
+      # -------------------------------------------------------------
+      # 4. HTTP proxy (Privoxy :8118) egress & anonymity check
+      # -------------------------------------------------------------
+      - name: Verify HTTP Proxy (Port 8118) Egress & Anonymity
+        run: |
+          RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
+          echo "Testing Privoxy HTTP Proxy via http://127.0.0.1:8118..."
+          
+          RESP=$(curl -s --connect-timeout 20 --proxy http://127.0.0.1:8118 https://check.torproject.org/api/ip)
+          echo "Privoxy Response: $RESP"
+          
+          IS_TOR=$(echo "$RESP" | jq -r '.IsTor')
+          EXIT_IP=$(echo "$RESP" | jq -r '.IP')
+          
+          if [ "$IS_TOR" != "true" ]; then
+            echo "❌ ERROR: Request via Privoxy is NOT recognized as Tor traffic (IsTor=$IS_TOR)."
+            exit 1
+          fi
+          
+          if [ "$EXIT_IP" = "$RUNNER_IP" ]; then
+            echo "❌ CRITICAL: IP Leak detected! Exit IP matches Runner Host IP ($EXIT_IP)."
+            exit 1
+          fi
+          
+          echo "✅ HTTP Proxy OK: Exit-IP is $EXIT_IP (IsTor=true, IP != Host)"
+          echo "initial_http_ip=$EXIT_IP" >> "$GITHUB_ENV"
+
+      # -------------------------------------------------------------
+      # 5. SOCKS5 proxy (Tor :9050) egress & remote DNS check
+      # -------------------------------------------------------------
+      - name: Verify SOCKS5 Proxy (Port 9050) Egress & DNS Resolution
+        run: |
+          RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
+          echo "Testing Tor SOCKS5 Proxy via socks5h://127.0.0.1:9050 (Remote DNS)..."
+          
+          RESP=$(curl -s --connect-timeout 20 --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip)
+          echo "SOCKS5 Response: $RESP"
+          
+          IS_TOR=$(echo "$RESP" | jq -r '.IsTor')
+          EXIT_IP=$(echo "$RESP" | jq -r '.IP')
+          
+          if [ "$IS_TOR" != "true" ]; then
+            echo "❌ ERROR: Request via SOCKS5 is NOT recognized as Tor traffic (IsTor=$IS_TOR)."
+            exit 1
+          fi
+          
+          if [ "$EXIT_IP" = "$RUNNER_IP" ]; then
+            echo "❌ CRITICAL: SOCKS5 IP Leak detected! ($EXIT_IP)."
+            exit 1
+          fi
+          
+          echo "✅ SOCKS5 Proxy OK: Exit-IP is $EXIT_IP (IsTor=true)"
+
+      # -------------------------------------------------------------
+      # 6. Circuit rotation (/reconnect -> SIGNAL NEWNYM)
+      # -------------------------------------------------------------
+      - name: Verify Circuit Rotation (/reconnect -> SIGNAL NEWNYM)
+        run: |
+          OLD_IP="${{ env.initial_http_ip }}"
+          echo "Current Exit IP before rotation: $OLD_IP"
+          
+          echo "Triggering IP reconnect via REST API..."
+          RECONNECT_RESP=$(curl -s -X POST http://localhost:8080/reconnect)
+          echo "Reconnect Response: $RECONNECT_RESP"
+          
+          # Tor rate-limits SIGNAL NEWNYM if sent within 10s of a previous signal
+          echo "Waiting 15 seconds for new Tor circuit establishment..."
+          sleep 15
+          
+          NEW_RESP=$(curl -s --connect-timeout 20 --proxy http://127.0.0.1:8118 https://check.torproject.org/api/ip)
+          echo "New Check Response: $NEW_RESP"
+          
+          IS_TOR_NEW=$(echo "$NEW_RESP" | jq -r '.IsTor')
+          NEW_IP=$(echo "$NEW_RESP" | jq -r '.IP')
+          
+          if [ "$IS_TOR_NEW" != "true" ]; then
+            echo "❌ ERROR: Rotated circuit is NOT recognized as Tor traffic."
+            exit 1
+          fi
+          
+          echo "Initial IP: $OLD_IP"
+          echo "New IP:     $NEW_IP"
+          
+          if [ "$NEW_IP" = "$OLD_IP" ]; then
+            echo "⚠️ Warning: Exit IP unchanged after rotation ($NEW_IP). Note: Tor may select same exit node if circuit pool is small, but circuit was refreshed."
+          else
+            echo "✅ Circuit successfully rotated to new Exit-IP: $NEW_IP"
+          fi
+
+      # -------------------------------------------------------------
+      # 7. Generate step summary
+      # -------------------------------------------------------------
+      - name: Generate Step Summary
+        if: always()
+        run: |
+          echo "### 🛡️ Daily Torproxy Canary Verification Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image:** \`hapheus/torproxy:${{ github.event.inputs.image_tag || 'latest' }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Runner Host IP:** \`${{ steps.host-info.outputs.runner_ip }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Initial Tor Exit IP:** \`${{ env.initial_http_ip }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Result:** ${{ job.status == 'success' && '✅ PASSED' || '❌ FAILED' }}" >> "$GITHUB_STEP_SUMMARY"
+
+      # -------------------------------------------------------------
+      # 8. Stop and clean up container
+      # -------------------------------------------------------------
+      - name: Cleanup Container
+        if: always()
+        run: |
+          echo "Stopping and cleaning up container..."
+          docker stop torproxy-canary || true
+          docker rm -f torproxy-canary || true
+
+      # -------------------------------------------------------------
+      # 9. Alert on failure (GitHub issue automation)
+      # -------------------------------------------------------------
+      - name: Alert on Failure (Create/Update Issue)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueTitle = "🚨 Daily Live Image Verification Failed";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `### 🚨 Daily Canary Failure Detected\n\n` +
+                         `The scheduled daily verification of \`hapheus/torproxy:latest\` failed.\n\n` +
+                         `- **Run:** [View Action Run](${runUrl})\n` +
+                         `- **Date:** ${new Date().toISOString()}\n` +
+                         `- **Cause:** Bootstrap timeout, proxy failure, or Tor network / Directory Authority outage.\n\n` +
+                         `Please check the workflow logs for container output and exit status.`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['canary-alert']
+            });
+
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: `**Repeated Failure:** Canary run failed again on ${new Date().toISOString()}.\n[View Run](${runUrl})`
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: body,
+                labels: ['canary-alert', 'bug', 'priority/p1-urgent']
+              });
+            }

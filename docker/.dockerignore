@@ -5,3 +5,9 @@ README.md
 CONTRIBUTING.md
 LICENSE
 docker-compose.yml
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+.pytest_cache
+.ruff_cache

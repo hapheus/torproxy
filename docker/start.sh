@@ -37,6 +37,7 @@ validate_configuration
 sed \
   -e "s|__TORPROXY_LISTEN_ADDRESS__|$TORPROXY_LISTEN_ADDRESS|" \
   -e "s|__TORPROXY_LISTEN_PORT__|$TORPROXY_LISTEN_PORT|" \
+  -e "s|__TORPROXY_SOCKS_PORT__|$TORPROXY_SOCKS_PORT|" \
   /etc/privoxy/config.template > /tmp/privoxy.config
 
 sed \
