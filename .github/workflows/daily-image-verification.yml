@@ -63,13 +63,12 @@ jobs:
           BOOTSTRAPPED=false
           for i in {1..36}; do
             STATUS_JSON=$(curl -s --connect-timeout 5 http://localhost:8080/status || echo "{}")
-            IS_BOOTSTRAPPED=$(echo "$STATUS_JSON" | jq -r '.tor.bootstrapped // false')
             STATUS=$(echo "$STATUS_JSON" | jq -r '.status // "unknown"')
-            PROGRESS=$(echo "$STATUS_JSON" | jq -r '.tor.bootstrap_phase // "pending"')
+            DETAIL=$(echo "$STATUS_JSON" | jq -r '.detail // ""')
             
-            echo "Attempt $i/36: Status='$STATUS', Bootstrapped='$IS_BOOTSTRAPPED', Phase='$PROGRESS'"
+            echo "Attempt $i/36: Status='$STATUS', Detail='$DETAIL'"
             
-            if [ "$IS_BOOTSTRAPPED" = "true" ] && [ "$STATUS" = "connected" ]; then
+            if [ "$STATUS" = "connected" ]; then
               echo "✅ Tor successfully bootstrapped and connected!"
               BOOTSTRAPPED=true
               break
