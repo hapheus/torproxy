@@ -2,7 +2,7 @@ name: "Daily Live Image Verification"
 
 on:
   schedule:
-    # Daily at 04:00 UTC (before European business hours start)
+    # Daily at 04:00 UTC (before European business hours)
     - cron: "0 4 * * *"
   workflow_dispatch:
     inputs:
@@ -10,11 +10,18 @@ on:
         description: "Docker Image Tag to test (default: latest)"
         required: true
         default: "latest"
+  workflow_run:
+    workflows: ["Publish Docker image"]
+    types:
+      - completed
+    branches:
+      - main
 
 jobs:
   verify-live-image:
     name: "Live Tor Canary Verification"
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       issues: write
@@ -34,8 +41,18 @@ jobs:
           echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------------------------
-      # 2. Pull and start current Docker image
+      # 2. Authenticate and pull latest Docker image
       # -------------------------------------------------------------
+      - name: Log in to Docker Hub (Rate Limit Prevention)
+        if: env.DOCKERHUB_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: hapheus
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Pull and Run torproxy Container
         id: run-container
         run: |
@@ -54,7 +71,7 @@ jobs:
           echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------------------------
-      # 3. Live check: wait for 100% Tor bootstrap (SLA: max 180s)
+      # 3. Live verification: wait for 100% Tor bootstrap (SLA: max 180s)
       # -------------------------------------------------------------
       - name: Wait for Tor 100% Bootstrap
         timeout-minutes: 4
@@ -84,7 +101,7 @@ jobs:
           fi
 
       # -------------------------------------------------------------
-      # 4. HTTP proxy (Privoxy :8118) egress & anonymity check
+      # 4. HTTP proxy (Privoxy :8118) egress and anonymity check
       # -------------------------------------------------------------
       - name: Verify HTTP Proxy (Port 8118) Egress & Anonymity
         run: |
@@ -111,7 +128,7 @@ jobs:
           echo "initial_http_ip=$EXIT_IP" >> "$GITHUB_ENV"
 
       # -------------------------------------------------------------
-      # 5. SOCKS5 proxy (Tor :9050) egress & remote DNS check
+      # 5. SOCKS5 proxy (Tor :9050) egress and remote DNS check
       # -------------------------------------------------------------
       - name: Verify SOCKS5 Proxy (Port 9050) Egress & DNS Resolution
         run: |
@@ -148,7 +165,7 @@ jobs:
           RECONNECT_RESP=$(curl -s -X POST http://localhost:8080/reconnect)
           echo "Reconnect Response: $RECONNECT_RESP"
           
-          # Tor rate-limits SIGNAL NEWNYM if sent within 10s of a previous signal
+          # Tor ignores SIGNAL NEWNYM if sent again within 10 seconds
           echo "Waiting 15 seconds for new Tor circuit establishment..."
           sleep 15
           
@@ -173,7 +190,7 @@ jobs:
           fi
 
       # -------------------------------------------------------------
-      # 7. Generate step summary
+      # 7. Generate Step Summary
       # -------------------------------------------------------------
       - name: Generate Step Summary
         if: always()
@@ -195,7 +212,7 @@ jobs:
           docker rm -f torproxy-canary || true
 
       # -------------------------------------------------------------
-      # 9. Alert on failure (GitHub issue automation)
+      # 9. Alert on failure (GitHub Issue automation)
       # -------------------------------------------------------------
       - name: Alert on Failure (Create/Update Issue)
         if: failure()
