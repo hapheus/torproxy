@@ -1,21 +1,12 @@
 import json
 import socket
-import threading
 import time
 import urllib.error
 import urllib.request
-from http.server import ThreadingHTTPServer
 from unittest.mock import MagicMock, patch
 
 import api
 import pytest
-
-
-@pytest.fixture(autouse=True)
-def reset_ip_cache():
-    api.clear_ip_cache()
-    yield
-    api.clear_ip_cache()
 
 
 @pytest.mark.unit
@@ -194,15 +185,7 @@ class TestIPResolutionAndCaching:
         assert "Connection refused" in err
 
 
-@pytest.fixture(scope="module")
-def api_server():
-    server = ThreadingHTTPServer(("127.0.0.1", 0), api.APIHandler)
-    port = server.server_port
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f"http://127.0.0.1:{port}"
-    server.shutdown()
-    server.server_close()
+
 
 
 @pytest.mark.unit
