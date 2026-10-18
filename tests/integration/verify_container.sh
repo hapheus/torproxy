@@ -51,6 +51,16 @@ RECONN_RESP=$(curl -fsS -X POST "http://localhost:${API_PORT}/reconnect")
 echo "/reconnect response: $RECONN_RESP"
 echo "$RECONN_RESP" | jq -e '.action == "reconnect" and .status == "success"' >/dev/null
 
+# Test /diagnostics
+DIAG_RESP=$(curl -fsS "http://localhost:${API_PORT}/diagnostics")
+echo "$DIAG_RESP" | jq -e '.uptime_seconds >= 0' >/dev/null
+echo "$DIAG_RESP" | jq -e '.tor.network_enabled' >/dev/null
+
+# Test /metrics
+METRICS_RESP=$(curl -fsS "http://localhost:${API_PORT}/metrics")
+echo "$METRICS_RESP" | grep -q "torproxy_uptime_seconds"
+echo "$METRICS_RESP" | grep -q "torproxy_reconnect_total"
+
 # Test legacy GET mutation compatibility
 LEGACY_RESP=$(curl -fsS "http://localhost:${API_PORT}/reconnect")
 echo "legacy GET /reconnect response: $LEGACY_RESP"
