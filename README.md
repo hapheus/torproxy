@@ -157,13 +157,11 @@ Ready-to-run use cases with hardened configurations:
 
 ## Project Documentation
 
-- [docs/compatibility.md](docs/compatibility.md) — Absolute backward compatibility contract and frozen interfaces.
+- [docs/compatibility.md](docs/compatibility.md) — Backward compatibility contract and frozen interfaces.
 - [docs/api.md](docs/api.md) — Exhaustive REST API specification and response schemas.
 - [docs/configuration.md](docs/configuration.md) — Configuration guide and startup validation rules.
-- [docs/hardening.md](docs/hardening.md) — Container runtime hardening, read-only rootfs, and dropped capabilities.
-- [docs/releases.md](docs/releases.md) — Semantic versioning policy, upgrade paths, and instant rollback procedures.
-- [docs/quality-baseline.md](docs/quality-baseline.md) — Measurable quality and performance baselines.
-- [docs/quality-gate-10-10.md](docs/quality-gate-10-10.md) — Final 10/10 quality gate audit and verification matrix.
+- [docs/hardening.md](docs/hardening.md) — Container runtime hardening, read-only rootfs, and security recommendations.
+- [docs/releases.md](docs/releases.md) — Semantic versioning policy, upgrade paths, and rollback procedures.
 
 ---
 

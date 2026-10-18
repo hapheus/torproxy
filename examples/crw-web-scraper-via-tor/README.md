@@ -1,6 +1,6 @@
 # CRW Web Scraper Through a Tor Proxy with Docker Compose
 
-This example runs the self-hosted **CRW web scraper** from `ghcr.io/us/crw:latest` behind **torproxy**. CRW routes its scrape, crawl, and map requests through the Tor HTTP proxy and returns structured web content for applications, data pipelines, and AI agents.
+This example runs the self-hosted **CRW web scraper** from `ghcr.io/us/crw:latest` behind **torproxy**. CRW routes its scrape, crawl, and map requests through the Tor HTTP proxy and returns structured web content for applications and automated data pipelines.
 
 Use this setup when an HTTP scraping API is a better fit than a full browser. CRW can turn a web page into Markdown or JSON without requiring every client to manage proxy settings itself.
 

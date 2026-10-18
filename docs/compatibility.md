@@ -19,7 +19,7 @@ This document defines the strict, non-negotiable backward compatibility contract
 | **HTTP Proxy** | `8118` | `8118` (`127.0.0.1`) | HTTP (Privoxy) | Unauthenticated | Standard HTTP/HTTPS forward proxy routed via Tor SOCKS5. |
 | **SOCKS5 Proxy** | `9050` | `9050` (`127.0.0.1`) | SOCKS5 (Tor) | Unauthenticated | Tor SOCKS5 proxy with remote DNS resolution (`socks5h`). |
 | **Control REST API** | `8080` | `8080` (`127.0.0.1`) | HTTP/REST | Unauthenticated | JSON management and monitoring interface. |
-| **Tor ControlPort** | `9051` | Not Published | Tor Control | Cookie (M1+) | Internal loopback only (`127.0.0.1:9051`), never published to host. |
+| **Tor ControlPort** | `9051` | Not Published | Tor Control | Cookie Auth | Internal loopback only (`127.0.0.1:9051`), never published to host. |
 
 ### Network Guarantees vs. Implementation Details
 
