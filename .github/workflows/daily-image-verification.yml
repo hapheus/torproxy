@@ -62,7 +62,7 @@ jobs:
           IMAGE_NAME="hapheus/torproxy:${IMAGE_TAG}"
           echo "Pulling Docker Image: $IMAGE_NAME..."
           docker pull "$IMAGE_NAME"
-          
+
           echo "Starting Container..."
           CONTAINER_ID=$(docker run -d \
             --name torproxy-canary \
@@ -84,9 +84,9 @@ jobs:
             STATUS_JSON=$(curl -s --connect-timeout 5 http://localhost:8080/status || echo "{}")
             STATUS=$(echo "$STATUS_JSON" | jq -r '.status // "unknown"')
             DETAIL=$(echo "$STATUS_JSON" | jq -r '.detail // ""')
-            
+
             echo "Attempt $i/36: Status='$STATUS', Detail='$DETAIL'"
-            
+
             if [ "$STATUS" = "connected" ]; then
               echo "✅ Tor successfully bootstrapped and connected!"
               echo "Stabilizing Tor circuit pool for 5s..."
@@ -109,7 +109,7 @@ jobs:
         run: |
           RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
           echo "Testing Privoxy HTTP Proxy via http://127.0.0.1:8118..."
-          
+
           RESP=""
           for attempt in 1 2 3; do
             echo "HTTP Proxy check attempt $attempt/3..."
@@ -119,12 +119,12 @@ jobs:
             fi
             sleep 3
           done
-          
+
           echo "Privoxy Response: $RESP"
-          
+
           IS_TOR=$(echo "$RESP" | jq -r '.IsTor // empty')
           EXIT_IP=$(echo "$RESP" | jq -r '.IP // empty')
-          
+
           if [ -z "$EXIT_IP" ]; then
             echo "⚠️ check.torproject.org unresponsive; checking fallback IP reflection via api.ipify.org..."
             EXIT_IP=$(curl -sS --connect-timeout 15 --max-time 30 --proxy http://127.0.0.1:8118 https://api.ipify.org 2>/dev/null || true)
@@ -133,17 +133,17 @@ jobs:
               IS_TOR="true"
             fi
           fi
-          
+
           if [ "$IS_TOR" != "true" ]; then
             echo "❌ ERROR: Request via Privoxy is NOT recognized as Tor traffic (IsTor=$IS_TOR, Response=$RESP)."
             exit 1
           fi
-          
+
           if [ "$EXIT_IP" = "$RUNNER_IP" ]; then
             echo "❌ CRITICAL: IP Leak detected! Exit IP matches Runner Host IP ($EXIT_IP)."
             exit 1
           fi
-          
+
           echo "✅ HTTP Proxy OK: Exit-IP is $EXIT_IP (IsTor=true, IP != Host)"
           echo "initial_http_ip=$EXIT_IP" >> "$GITHUB_ENV"
 
@@ -154,7 +154,7 @@ jobs:
         run: |
           RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
           echo "Testing Tor SOCKS5 Proxy via socks5h://127.0.0.1:9050 (Remote DNS)..."
-          
+
           RESP=""
           for attempt in 1 2 3; do
             echo "SOCKS5 Proxy check attempt $attempt/3..."
@@ -164,12 +164,12 @@ jobs:
             fi
             sleep 3
           done
-          
+
           echo "SOCKS5 Response: $RESP"
-          
+
           IS_TOR=$(echo "$RESP" | jq -r '.IsTor // empty')
           EXIT_IP=$(echo "$RESP" | jq -r '.IP // empty')
-          
+
           if [ -z "$EXIT_IP" ]; then
             echo "⚠️ check.torproject.org unresponsive; checking fallback IP reflection via api.ipify.org..."
             EXIT_IP=$(curl -sS --connect-timeout 15 --max-time 30 --socks5-hostname 127.0.0.1:9050 https://api.ipify.org 2>/dev/null || true)
@@ -178,17 +178,17 @@ jobs:
               IS_TOR="true"
             fi
           fi
-          
+
           if [ "$IS_TOR" != "true" ]; then
             echo "❌ ERROR: Request via SOCKS5 is NOT recognized as Tor traffic (IsTor=$IS_TOR, Response=$RESP)."
             exit 1
           fi
-          
+
           if [ "$EXIT_IP" = "$RUNNER_IP" ]; then
             echo "❌ CRITICAL: SOCKS5 IP Leak detected! ($EXIT_IP)."
             exit 1
           fi
-          
+
           echo "✅ SOCKS5 Proxy OK: Exit-IP is $EXIT_IP (IsTor=true)"
 
       # -------------------------------------------------------------
@@ -198,15 +198,15 @@ jobs:
         run: |
           OLD_IP="${{ env.initial_http_ip }}"
           echo "Current Exit IP before rotation: $OLD_IP"
-          
+
           echo "Triggering IP reconnect via REST API..."
           RECONNECT_RESP=$(curl -sS -X POST http://localhost:8080/reconnect || echo "{}")
           echo "Reconnect Response: $RECONNECT_RESP"
-          
+
           # Tor ignores SIGNAL NEWNYM if sent again within 10 seconds
           echo "Waiting 15 seconds for new Tor circuit establishment..."
           sleep 15
-          
+
           NEW_RESP=""
           for attempt in 1 2 3; do
             echo "Post-reconnect check attempt $attempt/3..."
@@ -216,27 +216,27 @@ jobs:
             fi
             sleep 3
           done
-          
+
           echo "New Check Response: $NEW_RESP"
-          
+
           IS_TOR_NEW=$(echo "$NEW_RESP" | jq -r '.IsTor // empty')
           NEW_IP=$(echo "$NEW_RESP" | jq -r '.IP // empty')
-          
+
           if [ -z "$NEW_IP" ]; then
             NEW_IP=$(curl -sS --connect-timeout 15 --max-time 30 --proxy http://127.0.0.1:8118 https://api.ipify.org 2>/dev/null || true)
             if [ -n "$NEW_IP" ] && [ "$NEW_IP" != "${{ steps.host-info.outputs.runner_ip }}" ]; then
               IS_TOR_NEW="true"
             fi
           fi
-          
+
           if [ "$IS_TOR_NEW" != "true" ]; then
             echo "❌ ERROR: Rotated circuit is NOT recognized as Tor traffic."
             exit 1
           fi
-          
+
           echo "Initial IP: $OLD_IP"
           echo "New IP:     $NEW_IP"
-          
+
           if [ "$NEW_IP" = "$OLD_IP" ]; then
             echo "⚠️ Warning: Exit IP unchanged after rotation ($NEW_IP). Note: Tor may select same exit node if circuit pool is small, but circuit was refreshed."
           else

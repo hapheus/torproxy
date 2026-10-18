@@ -1,0 +1,159 @@
+# REST API Reference
+
+The `torproxy` container includes an internal REST API server written in Python. It provides status monitoring and operational control over the local Tor daemon without requiring external consumers to implement the Tor Control Protocol.
+
+## 1. General Conventions
+
+- **Default Port:** `8080` (configurable via `TORPROXY_API_PORT`)
+- **Default Host Access:** `http://127.0.0.1:8080`
+- **Docker Network Access:** `http://torproxy:8080`
+- **Content-Type:** `application/json`
+- **CORS:** `Access-Control-Allow-Origin: *` is returned on all responses.
+- **Authentication:** None by default. Access must be restricted to trusted networks and loopback interfaces.
+- **Method Policy:** Both `GET` and `POST` methods are accepted by all endpoints. `POST` is recommended for state mutations (`/connect`, `/disconnect`, `/reconnect`), but `GET` is permanently preserved for backward compatibility.
+
+---
+
+## 2. Endpoints
+
+### GET | POST `/status` (or `/`)
+Returns the current connection state and verified egress IP.
+
+#### Response (Connected - 200 OK)
+```json
+{
+  "status": "connected",
+  "ip": "185.220.101.5"
+}
+```
+
+#### Response (Connecting - 200 OK)
+```json
+{
+  "status": "connecting",
+  "ip": null,
+  "detail": "Tor bootstrapping: Handshake"
+}
+```
+
+#### Response (Disconnected - 200 OK)
+```json
+{
+  "status": "disconnected",
+  "ip": null
+}
+```
+
+#### Response (Control Error - 500 Internal Server Error)
+```json
+{
+  "error": "Failed to query Tor: <message>"
+}
+```
+
+---
+
+### GET | POST `/ip`
+Returns the current public Tor egress IP address, or `503 Service Unavailable` if the proxy is not ready.
+
+#### Response (Success - 200 OK)
+```json
+{
+  "ip": "185.220.101.5"
+}
+```
+
+#### Response (Unavailable - 503 Service Unavailable)
+```json
+{
+  "error": "Could not retrieve IP. Proxy may be offline or connecting.",
+  "detail": "<error details>"
+}
+```
+
+---
+
+### GET | POST `/connect`
+Enables the Tor network connection (`SETCONF DisableNetwork=0`).
+
+#### Response (Success - 200 OK)
+```json
+{
+  "action": "connect",
+  "status": "success"
+}
+```
+
+#### Response (Error - 500 Internal Server Error)
+```json
+{
+  "error": "Failed to enable Tor network: <message>"
+}
+```
+
+---
+
+### GET | POST `/disconnect`
+Disables the Tor network connection (`SETCONF DisableNetwork=1`) and clears the cached egress IP.
+
+#### Response (Success - 200 OK)
+```json
+{
+  "action": "disconnect",
+  "status": "success"
+}
+```
+
+#### Response (Error - 500 Internal Server Error)
+```json
+{
+  "error": "Failed to disable Tor network: <message>"
+}
+```
+
+---
+
+### GET | POST `/reconnect`
+Requests a new Tor circuit (`SIGNAL NEWNYM`) and invalidates the cached egress IP. Note that while Tor creates a new circuit, exit IP rotation is subject to Tor circuit availability and rate limits.
+
+#### Response (Success - 200 OK)
+```json
+{
+  "action": "reconnect",
+  "status": "success"
+}
+```
+
+#### Response (Error - 500 Internal Server Error)
+```json
+{
+  "error": "Failed to trigger reconnect: <message>"
+}
+```
+
+---
+
+### Unhandled Paths (404 Not Found)
+Any request to an unsupported path returns `404 Not Found`.
+
+#### Response (404 Not Found)
+```json
+{
+  "error": "Not Found",
+  "supported_paths": [
+    "/status",
+    "/ip",
+    "/connect",
+    "/disconnect",
+    "/reconnect"
+  ]
+}
+```
+
+---
+
+## 3. IP Caching Semantics
+
+- **Time-to-Live (TTL):** 30 seconds.
+- **Cache Eviction:** Automatically invalidated whenever `/disconnect` or `/reconnect` is executed.
+- **Verification Source:** Evaluated against `https://check.torproject.org/api/ip` through the local Privoxy proxy (`127.0.0.1:8118`).
