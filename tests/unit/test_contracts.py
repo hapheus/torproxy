@@ -305,6 +305,18 @@ class TestComposeExamplesContract:
             assert "TORPROXY_API_PORT: 8080" in content
             assert "TORPROXY_SOCKS_PORT: 9050" in content
 
+    def test_no_example_exposes_management_api_to_wildcard_host(self):
+        for example in self.EXAMPLES:
+            compose_path = os.path.join(REPO_ROOT, "examples", example, "docker-compose.yml")
+            with open(compose_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            # Wildcard publication like "8080:8080" or "0.0.0.0:8080:8080" is forbidden in examples
+            assert '"8080:8080"' not in content, (
+                f"{example} publishes 8080 without host restriction"
+            )
+            assert "0.0.0.0:8080" not in content, f"{example} publishes 8080 to 0.0.0.0"
+
+
 
 @pytest.mark.unit
 class TestServerLifecycle:

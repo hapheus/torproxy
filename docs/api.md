@@ -157,3 +157,4 @@ Any request to an unsupported path returns `404 Not Found`.
 - **Time-to-Live (TTL):** 30 seconds.
 - **Cache Eviction:** Automatically invalidated whenever `/disconnect` or `/reconnect` is executed.
 - **Verification Source:** Evaluated against `https://check.torproject.org/api/ip` through the local Privoxy proxy (`127.0.0.1:8118`).
+- **Egress Guarantee:** Egress verification strictly requires `IsTor: true` from the check service. Responses with `IsTor: false` or missing verification fields are rejected and never cached or reported as connected.

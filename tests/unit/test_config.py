@@ -42,3 +42,77 @@ class TestShellScriptSyntax:
         script_path = os.path.join(DOCKER_DIR, script)
         res = subprocess.run(["bash", "-n", script_path], capture_output=True, text=True)
         assert res.returncode == 0, f"Bash syntax check failed for {script}: {res.stderr}"
+
+
+@pytest.mark.unit
+class TestStartScriptValidation:
+    START_SCRIPT = os.path.join(DOCKER_DIR, "start.sh")
+
+    def _run_validate(self, env_overrides):
+        env = os.environ.copy()
+        env.update(env_overrides)
+        bash_cmd = (
+            f"source <(sed -n '/^validate_configuration()/,/^}}/p' '{self.START_SCRIPT}'); "
+            "validate_configuration"
+        )
+        return subprocess.run(["bash", "-c", bash_cmd], env=env, capture_output=True, text=True)
+
+    def test_valid_default_configuration(self):
+        env = {
+            "TORPROXY_LISTEN_ADDRESS": "0.0.0.0",
+            "TORPROXY_LISTEN_PORT": "8118",
+            "TORPROXY_API_PORT": "8080",
+            "TORPROXY_SOCKS_PORT": "9050",
+        }
+        res = self._run_validate(env)
+        assert res.returncode == 0, f"Unexpected validation failure: {res.stderr}"
+
+    @pytest.mark.parametrize("invalid_ip", [
+        "999.999.999.999",
+        "1.2.3",
+        "1.2.3.4.5",
+        "abc",
+        "127.0.0.1a",
+        "",
+    ])
+    def test_invalid_listen_address(self, invalid_ip):
+        env = {
+            "TORPROXY_LISTEN_ADDRESS": invalid_ip,
+            "TORPROXY_LISTEN_PORT": "8118",
+            "TORPROXY_API_PORT": "8080",
+            "TORPROXY_SOCKS_PORT": "9050",
+        }
+        res = self._run_validate(env)
+        assert res.returncode == 1
+        assert "TORPROXY_LISTEN_ADDRESS" in res.stderr
+
+    @pytest.mark.parametrize("port_var", [
+        "TORPROXY_LISTEN_PORT",
+        "TORPROXY_API_PORT",
+        "TORPROXY_SOCKS_PORT",
+    ])
+    @pytest.mark.parametrize("invalid_port", ["0", "65536", "-1", "abc", ""])
+    def test_invalid_ports(self, port_var, invalid_port):
+        env = {
+            "TORPROXY_LISTEN_ADDRESS": "0.0.0.0",
+            "TORPROXY_LISTEN_PORT": "8118",
+            "TORPROXY_API_PORT": "8080",
+            "TORPROXY_SOCKS_PORT": "9050",
+        }
+        env[port_var] = invalid_port
+        res = self._run_validate(env)
+        assert res.returncode == 1
+        assert port_var in res.stderr
+        assert "between 1 and 65535" in res.stderr
+
+    def test_conflicting_ports_rejected(self):
+        env = {
+            "TORPROXY_LISTEN_ADDRESS": "0.0.0.0",
+            "TORPROXY_LISTEN_PORT": "8080",
+            "TORPROXY_API_PORT": "8080",
+            "TORPROXY_SOCKS_PORT": "9050",
+        }
+        res = self._run_validate(env)
+        assert res.returncode == 1
+        assert "Configuration error" in res.stderr
+        assert "must all be distinct" in res.stderr
