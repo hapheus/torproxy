@@ -58,11 +58,11 @@ jobs:
       - name: Install Test Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest pytest-cov
 
-      - name: Run Pytest (Hermetic Unit Tests)
+      - name: Run Pytest (Hermetic Unit Tests with Coverage)
         run: |
-          pytest tests/unit/ -v
+          pytest tests/unit/ -v --cov=docker --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
   docker-smoke:
     name: "Docker Build & Container Smoke Test"
@@ -71,6 +71,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Log in to Docker Hub (Rate Limit Exemption)
         uses: docker/login-action@v3
@@ -110,7 +115,7 @@ jobs:
             torproxy:smoke-test)
           echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"
           # Brief sleep to allow processes to start
-          sleep 3
+          sleep 4
 
       - name: Verify Non-Root User Execution
         run: |
@@ -131,6 +136,17 @@ jobs:
           echo "$PROCS" | grep -q "python3" || (echo "❌ API process is not running" && exit 1)
           echo "✅ All required daemons (tor, privoxy, api.py) are running."
 
+      - name: Run Multi-Port Integration & Fail-Closed Tests
+        run: |
+          chmod +x tests/integration/verify_container.sh
+          ./tests/integration/verify_container.sh torproxy-smoke 8080 8118 9050
+
+      - name: Run Pytest Integration Suite
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pytest tests/integration/ -v -m smoke
+
       - name: Verify Graceful Shutdown
         run: |
           echo "Stopping container with 5s timeout to test SIGTERM handling..."
@@ -145,7 +161,19 @@ jobs:
           fi
           echo "✅ Graceful shutdown successful."
 
-      - name: Cleanup Smoke Container
+      - name: Verify Docker Compose Compatibility
+        run: |
+          echo "Testing standard docker-compose.yml startup..."
+          docker compose up -d --build
+          sleep 5
+          COMPOSE_CONTAINER=$(docker compose ps -q torproxy)
+          echo "Compose container ID: $COMPOSE_CONTAINER"
+          ./tests/integration/verify_container.sh "$COMPOSE_CONTAINER" 8080 8118 9050
+          docker compose down -v
+          echo "✅ Compose backward compatibility verified."
+
+      - name: Cleanup Containers
         if: always()
         run: |
           docker rm -f torproxy-smoke || true
+          docker compose down -v || true

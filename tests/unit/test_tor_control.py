@@ -64,6 +64,31 @@ class TestTorControlReplyParser:
         with pytest.raises(tor_control.TorControlError, match="EOF"):
             tor_control.read_reply(mock_sock)
 
+    def test_parse_unix_newline_lf(self):
+        mock_sock = MagicMock()
+        mock_sock.recv.side_effect = [b"250 OK\n"]
+        code, lines = tor_control.read_reply(mock_sock)
+        assert code == 250
+        assert lines == ["250 OK"]
+
+    def test_parse_malformed_short_line(self):
+        mock_sock = MagicMock()
+        mock_sock.recv.side_effect = [b"OK\r\n"]
+        with pytest.raises(tor_control.TorControlError, match="Malformed line"):
+            tor_control.read_reply(mock_sock)
+
+    def test_parse_malformed_non_digit_code(self):
+        mock_sock = MagicMock()
+        mock_sock.recv.side_effect = [b"ABC OK\r\n"]
+        with pytest.raises(tor_control.TorControlError, match="Malformed line"):
+            tor_control.read_reply(mock_sock)
+
+    def test_parse_unrecognized_separator(self):
+        mock_sock = MagicMock()
+        mock_sock.recv.side_effect = [b"250*Unrecognized\r\n"]
+        with pytest.raises(tor_control.TorControlError, match="Unrecognized separator"):
+            tor_control.read_reply(mock_sock)
+
 
 @pytest.mark.unit
 class TestTorControlAuthentication:
@@ -93,6 +118,20 @@ class TestTorControlAuthentication:
         assert err is None
         mock_sock.sendall.assert_called_once_with(b"AUTHENTICATE\r\n")
 
+    def test_authenticate_cookie_read_oserror(self, tmp_path):
+        cookie_file = tmp_path / "unreadable_cookie"
+        cookie_file.write_bytes(b"\x00" * 32)
+
+        mock_sock = MagicMock()
+        mock_sock.recv.side_effect = [b"250 OK\r\n"]
+
+        with patch("builtins.open", side_effect=OSError("Permission denied")):
+            success, err = tor_control.authenticate(mock_sock, cookie_path=str(cookie_file))
+            assert success is True
+            assert err is None
+            # Fallback to empty AUTHENTICATE
+            mock_sock.sendall.assert_called_once_with(b"AUTHENTICATE\r\n")
+
     def test_authenticate_failure_redacts_credentials(self, tmp_path):
         cookie_bytes = b"\x02" * 32
         cookie_file = tmp_path / "control_auth_cookie"
@@ -107,6 +146,14 @@ class TestTorControlAuthentication:
         assert "515" in err
         # Ensure cookie hex is never logged or contained in the error message
         assert cookie_bytes.hex() not in err
+
+    def test_authenticate_socket_exception(self):
+        mock_sock = MagicMock()
+        mock_sock.sendall.side_effect = socket.error("Connection reset by peer")
+
+        success, err = tor_control.authenticate(mock_sock, cookie_path="/nonexistent")
+        assert success is False
+        assert "socket error" in err
 
 
 @pytest.mark.unit
@@ -150,3 +197,15 @@ class TestTorControlCommandExecution:
 
         assert resp is None
         assert "timed out" in err
+
+    @patch("tor_control.socket.socket")
+    def test_execute_command_auth_failure(self, mock_socket_class):
+        mock_sock = MagicMock()
+        mock_socket_class.return_value.__enter__.return_value = mock_sock
+        mock_sock.recv.side_effect = [
+            b"515 Bad authentication\r\n",  # Auth reply fails
+        ]
+
+        resp, err = tor_control.send_command("SIGNAL NEWNYM", cookie_path="/nonexistent")
+        assert resp is None
+        assert "Tor control authentication failed" in err

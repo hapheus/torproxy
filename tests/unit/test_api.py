@@ -316,3 +316,24 @@ class TestAPIEndpoints:
         with pytest.raises(urllib.error.HTTPError) as exc_info:
             urllib.request.urlopen(f"{api_server}/invalid-path")
         assert exc_info.value.code == 404
+
+    def test_unsupported_http_method(self, api_server):
+        req = urllib.request.Request(f"{api_server}/status", method="DELETE")
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 501
+
+
+@pytest.mark.unit
+class TestApiServerRun:
+    @patch("api.ThreadingHTTPServer")
+    def test_run_server_handles_keyboard_interrupt(self, mock_server_class):
+        mock_instance = MagicMock()
+        mock_instance.serve_forever.side_effect = KeyboardInterrupt
+        mock_server_class.return_value = mock_instance
+
+        api.run()
+
+        mock_server_class.assert_called_once_with(("0.0.0.0", 8080), api.APIHandler)
+        mock_instance.serve_forever.assert_called_once()
+        mock_instance.server_close.assert_called_once()
