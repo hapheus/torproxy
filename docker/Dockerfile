@@ -2,13 +2,13 @@ FROM debian:bookworm-slim
 
 LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.description="A minimal HTTP proxy routed through Tor" \
-      org.opencontainers.image.version="1.2.0" \
+      org.opencontainers.image.version="1.3.0" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://github.com/hapheus/torproxy" \
       org.opencontainers.image.url="https://github.com/hapheus/torproxy"
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl privoxy tini tor python3 \
+    && apt-get install --no-install-recommends -y ca-certificates curl privoxy tini tor tor-geoipdb python3 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --home-dir /var/lib/tor --shell /usr/sbin/nologin torproxy \
     && install -d -m 0700 -o torproxy -g torproxy /var/lib/tor \

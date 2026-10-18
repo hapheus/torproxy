@@ -41,6 +41,8 @@ This document defines the strict, non-negotiable backward compatibility contract
 | `TORPROXY_API_PORT` | `8080` | Integer `1`–`65535` | Listening port for the Python REST API server. |
 | `TORPROXY_SOCKS_PORT` | `9050` | Integer `1`–`65535` | Listening port for Tor SOCKS5 inside the container. |
 | `TORPROXY_HOST_PORT` | `8118` | Integer `1`–`65535` | Compose host port mapping for the HTTP proxy. |
+| `TORPROXY_COUNTRY` | *(unset)* | Comma-separated ISO codes | Optional: Restricts Tor exit nodes by country. Default: standard unrestricted Tor routing. |
+| `TORPROXY_STRICT_NODES` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Refuse circuits if country exit nodes are unavailable. Default: `0`. |
 
 ---
 

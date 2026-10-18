@@ -4,6 +4,8 @@ SocksPort 0.0.0.0:__TORPROXY_SOCKS_PORT__
 ControlPort 127.0.0.1:9051
 CookieAuthentication 1
 DataDirectory /var/lib/tor
+GeoIPFile /usr/share/tor/geoip
+GeoIPv6File /usr/share/tor/geoip6
 RunAsDaemon 0
 AvoidDiskWrites 1
 ClientOnly 1

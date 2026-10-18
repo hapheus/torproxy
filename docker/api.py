@@ -5,6 +5,7 @@ import re
 import socket
 import threading
 import time
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -25,6 +26,12 @@ _start_time = time.time()
 _metrics_lock = threading.Lock()
 _reconnect_count = 0
 _last_reconnect_time = None
+
+# Active country exit node tracking
+_country_lock = threading.Lock()
+_active_country = None
+_active_strict_nodes = None
+_country_state_initialized = False
 
 
 def send_tor_command(command):
@@ -51,6 +58,117 @@ def reset_metrics():
         _start_time = time.time()
         _reconnect_count = 0
         _last_reconnect_time = None
+
+
+def get_configured_country():
+    val = os.environ.get("TORPROXY_COUNTRY") or os.environ.get("TORPROXY_EXIT_COUNTRY") or ""
+    val = val.strip()
+    return val.upper() if val else None
+
+
+def get_strict_nodes():
+    val = os.environ.get("TORPROXY_STRICT_NODES")
+    if val is not None:
+        return val.strip().lower() in ("1", "true", "yes")
+    return bool(get_configured_country())
+
+
+def get_current_country():
+    global _country_state_initialized, _active_country, _active_strict_nodes
+    with _country_lock:
+        if not _country_state_initialized:
+            _active_country = get_configured_country()
+            _active_strict_nodes = get_strict_nodes()
+            _country_state_initialized = True
+        return _active_country
+
+
+def get_current_strict_nodes():
+    global _country_state_initialized, _active_country, _active_strict_nodes
+    with _country_lock:
+        if not _country_state_initialized:
+            _active_country = get_configured_country()
+            _active_strict_nodes = get_strict_nodes()
+            _country_state_initialized = True
+        return _active_strict_nodes
+
+
+def set_current_country_state(country, strict_nodes=None):
+    global _country_state_initialized, _active_country, _active_strict_nodes
+    with _country_lock:
+        _active_country = country
+        if strict_nodes is not None:
+            _active_strict_nodes = strict_nodes
+        _country_state_initialized = True
+
+
+def reset_country_state():
+    global _country_state_initialized, _active_country, _active_strict_nodes
+    with _country_lock:
+        _active_country = None
+        _active_strict_nodes = None
+        _country_state_initialized = False
+
+
+def validate_country_input(country_input):
+    """Validates country input.
+
+    Accepts:
+      - string: "DE", "DE,AT", "de, at", "", "none", "any", "all", "*"
+      - list: ["DE", "AT"]
+      - None (unspecified)
+    Returns:
+      (tor_exit_nodes_param, normalized_country_string, error_message)
+    """
+    if country_input is None:
+        return None, None, None
+
+    if isinstance(country_input, list):
+        parts = [str(item).strip() for item in country_input]
+    elif isinstance(country_input, str):
+        raw = country_input.strip()
+        if raw.lower() in ("", "any", "all", "none", "*"):
+            return "", None, None
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+    else:
+        return None, None, "Invalid country parameter format. Expected string or array of strings."
+
+    if not parts:
+        return "", None, None
+
+    normalized = []
+    tor_nodes = []
+    for p in parts:
+        if not re.match(r"^[a-zA-Z]{2}$", p):
+            return None, None, f"Invalid ISO country code: '{p}'. Must be 2-letter alpha code."
+        normalized.append(p.upper())
+        tor_nodes.append(f"{{{p.lower()}}}")
+
+    return ",".join(tor_nodes), ",".join(normalized), None
+
+
+def validate_strict_nodes_input(strict_input):
+    """Validates strict_nodes input.
+
+    Accepts: bool, int (0, 1), or str ("1", "0", "true", "false", "yes", "no").
+    Returns: (strict_bool, error_message)
+    """
+    if strict_input is None:
+        return None, None
+    if isinstance(strict_input, bool):
+        return strict_input, None
+    if isinstance(strict_input, int):
+        if strict_input in (0, 1):
+            return bool(strict_input), None
+        return None, "strict_nodes integer must be 0 or 1"
+    if isinstance(strict_input, str):
+        s = strict_input.strip().lower()
+        if s in ("1", "true", "yes"):
+            return True, None
+        if s in ("0", "false", "no"):
+            return False, None
+        return None, f"Invalid boolean value for strict_nodes: '{strict_input}'"
+    return None, "strict_nodes must be boolean, integer (0/1), or boolean string"
 
 
 def check_socks5_ready(port=None, timeout=1.5):
@@ -157,7 +275,31 @@ class APIHandler(BaseHTTPRequestHandler):
         self.handle_request()
 
     def handle_request(self):
-        path = self.path.strip("/")
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path.strip("/")
+        query_params = urllib.parse.parse_qs(parsed.query)
+
+        req_country = query_params.get("country", [None])[0]
+        req_strict = query_params.get("strict_nodes", query_params.get("strict", [None]))[0]
+
+        if self.command == "POST":
+            content_length_str = self.headers.get("Content-Length")
+            if content_length_str:
+                try:
+                    content_length = int(content_length_str)
+                    if content_length > 0:
+                        body_bytes = self.rfile.read(content_length)
+                        body_data = json.loads(body_bytes.decode("utf-8"))
+                        if isinstance(body_data, dict):
+                            if "country" in body_data:
+                                req_country = body_data["country"]
+                            if "strict_nodes" in body_data:
+                                req_strict = body_data["strict_nodes"]
+                            elif "strict" in body_data:
+                                req_strict = body_data["strict"]
+                except Exception as e:
+                    self.send_json(400, {"error": f"Malformed JSON request body: {e}"})
+                    return
 
         if path in ("status", ""):
             resp, err = send_tor_command("GETCONF DisableNetwork")
@@ -212,13 +354,63 @@ class APIHandler(BaseHTTPRequestHandler):
                     "detail": err,
                 })
 
-        elif path == "connect":
-            _, err = send_tor_command("SETCONF DisableNetwork=0")
-            if err:
-                self.send_json(500, {"error": f"Failed to enable Tor network: {err}"})
+        elif path in ("connect", "reconnect"):
+            tor_nodes, norm_country, c_err = validate_country_input(req_country)
+            if c_err:
+                self.send_json(400, {"error": c_err})
+                return
+
+            strict_bool, s_err = validate_strict_nodes_input(req_strict)
+            if s_err:
+                self.send_json(400, {"error": s_err})
+                return
+
+            if req_country is not None:
+                cmd = f"SETCONF ExitNodes={tor_nodes}" if tor_nodes else "SETCONF ExitNodes="
+                _, err = send_tor_command(cmd)
+                if err:
+                    self.send_json(500, {"error": f"Failed to configure ExitNodes in Tor: {err}"})
+                    return
+
+            if strict_bool is not None:
+                val = 1 if strict_bool else 0
+                _, err = send_tor_command(f"SETCONF StrictNodes={val}")
+                if err:
+                    self.send_json(500, {"error": f"Failed to configure StrictNodes in Tor: {err}"})
+                    return
+
+            if req_country is not None or strict_bool is not None:
+                new_country = norm_country if req_country is not None else get_current_country()
+                new_strict = (
+                    strict_bool if strict_bool is not None else get_current_strict_nodes()
+                )
+                set_current_country_state(new_country, new_strict)
+
+            if path == "connect":
+                _, err = send_tor_command("SETCONF DisableNetwork=0")
+                if err:
+                    self.send_json(500, {"error": f"Failed to enable Tor network: {err}"})
+                else:
+                    clear_ip_cache()
+                    resp_data = {"action": "connect", "status": "success"}
+                    curr_c = get_current_country()
+                    if curr_c:
+                        resp_data["exit_country"] = curr_c
+                        resp_data["strict_nodes"] = get_current_strict_nodes()
+                    self.send_json(200, resp_data)
             else:
-                clear_ip_cache()
-                self.send_json(200, {"action": "connect", "status": "success"})
+                _, err = send_tor_command("SIGNAL NEWNYM")
+                if err:
+                    self.send_json(500, {"error": f"Failed to trigger reconnect: {err}"})
+                else:
+                    clear_ip_cache()
+                    record_reconnect()
+                    resp_data = {"action": "reconnect", "status": "success"}
+                    curr_c = get_current_country()
+                    if curr_c:
+                        resp_data["exit_country"] = curr_c
+                        resp_data["strict_nodes"] = get_current_strict_nodes()
+                    self.send_json(200, resp_data)
 
         elif path == "disconnect":
             _, err = send_tor_command("SETCONF DisableNetwork=1")
@@ -227,15 +419,6 @@ class APIHandler(BaseHTTPRequestHandler):
             else:
                 clear_ip_cache()
                 self.send_json(200, {"action": "disconnect", "status": "success"})
-
-        elif path == "reconnect":
-            _, err = send_tor_command("SIGNAL NEWNYM")
-            if err:
-                self.send_json(500, {"error": f"Failed to trigger reconnect: {err}"})
-            else:
-                clear_ip_cache()
-                record_reconnect()
-                self.send_json(200, {"action": "reconnect", "status": "success"})
 
         elif path in ("health", "v1/health"):
             resp, err = send_tor_command("GETCONF DisableNetwork")
@@ -247,6 +430,9 @@ class APIHandler(BaseHTTPRequestHandler):
                 return
 
             network_enabled = "DisableNetwork=0" in resp
+            country = get_current_country()
+            strict_nodes = get_current_strict_nodes()
+
             if not network_enabled:
                 self.send_json(200, {
                     "status": "disconnected",
@@ -254,6 +440,8 @@ class APIHandler(BaseHTTPRequestHandler):
                         "network_enabled": False,
                         "bootstrapped": False,
                         "progress": 0,
+                        "exit_country": country,
+                        "strict_nodes": strict_nodes,
                     },
                     "proxies": {
                         "socks5": False,
@@ -283,6 +471,8 @@ class APIHandler(BaseHTTPRequestHandler):
                         "bootstrapped": False,
                         "progress": progress,
                         "summary": summary,
+                        "exit_country": country,
+                        "strict_nodes": strict_nodes,
                     },
                     "proxies": {
                         "socks5": socks_ready,
@@ -304,6 +494,8 @@ class APIHandler(BaseHTTPRequestHandler):
                     "bootstrapped": True,
                     "progress": 100,
                     "summary": "Done",
+                    "exit_country": country,
+                    "strict_nodes": strict_nodes,
                 },
                 "proxies": {
                     "socks5": socks_ready,
@@ -349,6 +541,8 @@ class APIHandler(BaseHTTPRequestHandler):
                         if bootstrap
                         else (b_err or "Unknown")
                     ),
+                    "exit_country": get_current_country(),
+                    "strict_nodes": get_current_strict_nodes(),
                 },
                 "proxies": {
                     "socks5_ready": socks_ready,
@@ -369,6 +563,8 @@ class APIHandler(BaseHTTPRequestHandler):
             progress = bootstrap.get("progress", 0) if bootstrap else 0
             bootstrapped = 1 if (bootstrap and bootstrap.get("bootstrapped")) else 0
             socks_ready = 1 if check_socks5_ready() else 0
+            country_str = get_current_country() or ""
+            strict_val = 1 if get_current_strict_nodes() else 0
 
             with _metrics_lock:
                 rec_count = _reconnect_count
@@ -393,6 +589,14 @@ class APIHandler(BaseHTTPRequestHandler):
                 "# HELP torproxy_socks5_ready SOCKS5 listener probe (1=ready, 0=down)",
                 "# TYPE torproxy_socks5_ready gauge",
                 f"torproxy_socks5_ready {socks_ready}",
+                "",
+                "# HELP torproxy_strict_nodes Tor StrictNodes setting (1=strict, 0=flexible)",
+                "# TYPE torproxy_strict_nodes gauge",
+                f"torproxy_strict_nodes {strict_val}",
+                "",
+                "# HELP torproxy_exit_country_info Configured exit country code",
+                "# TYPE torproxy_exit_country_info gauge",
+                f'torproxy_exit_country_info{{country="{country_str}"}} 1',
                 "",
             ]
             self.send_text(

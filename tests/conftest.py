@@ -14,10 +14,14 @@ import api  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def reset_ip_cache():
+def reset_api_state():
     api.clear_ip_cache()
+    api.reset_metrics()
+    api.reset_country_state()
     yield
     api.clear_ip_cache()
+    api.reset_metrics()
+    api.reset_country_state()
 
 
 @pytest.fixture(scope="module")

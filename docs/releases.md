@@ -26,8 +26,8 @@ Images are published to Docker Hub at [`hapheus/torproxy`](https://hub.docker.co
 | Tag | Mutability | Description |
 | --- | ---------- | ----------- |
 | `latest` | Mutable | Tracks the latest stable commit on the default branch (`main`). |
-| `vX.Y.Z` (e.g. `v1.2.0`) | **Immutable** | Official, cryptographically tagged release pointing to an exact commit. Recommended for production deployments. |
-| `vX.Y` (e.g. `v1.2`) | Mutable | Tracks the latest patch release within a minor release stream. |
+| `vX.Y.Z` (e.g. `v1.3.0`) | **Immutable** | Official, cryptographically tagged release pointing to an exact commit. Recommended for production deployments. |
+| `vX.Y` (e.g. `v1.3`) | Mutable | Tracks the latest patch release within a minor release stream. |
 
 ### Supported CPU Architectures
 Every official image build targets the following architectures using Docker Buildx:
