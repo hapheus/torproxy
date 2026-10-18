@@ -20,6 +20,12 @@ _cache_lock = threading.Lock()
 _cached_ip = None
 _cached_ip_time = 0
 
+# Runtime metrics tracking
+_start_time = time.time()
+_metrics_lock = threading.Lock()
+_reconnect_count = 0
+_last_reconnect_time = None
+
 
 def send_tor_command(command):
     return tor_control.send_command(command)
@@ -30,6 +36,21 @@ def clear_ip_cache():
     with _cache_lock:
         _cached_ip = None
         _cached_ip_time = 0
+
+
+def record_reconnect():
+    global _reconnect_count, _last_reconnect_time
+    with _metrics_lock:
+        _reconnect_count += 1
+        _last_reconnect_time = time.time()
+
+
+def reset_metrics():
+    global _start_time, _reconnect_count, _last_reconnect_time
+    with _metrics_lock:
+        _start_time = time.time()
+        _reconnect_count = 0
+        _last_reconnect_time = None
 
 
 def check_socks5_ready(port=None, timeout=1.5):
@@ -108,8 +129,12 @@ def get_tor_bootstrap_status():
 
 class APIHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        # Print logs to stdout for Docker logging
-        print(f"[API] {self.address_string()} - - {format % args}")
+        # Print logs to stdout for Docker logging without leaking query params or sensitive details
+        timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        msg = format % args
+        # Mask query strings to ensure URLs / sensitive tokens are never printed
+        msg = re.sub(r'(\s/[^?\s]*)\?[^\s]*(\s)', r'\1?REDACTED\2', msg)
+        print(f"[API] {timestamp} - {msg}")
 
     def send_json(self, status_code, data):
         self.send_response(status_code)
@@ -117,6 +142,13 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(json.dumps(data).encode("utf-8"))
+
+    def send_text(self, status_code, text, content_type="text/plain; charset=utf-8"):
+        self.send_response(status_code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(text.encode("utf-8"))
 
     def do_GET(self):
         self.handle_request()
@@ -202,6 +234,7 @@ class APIHandler(BaseHTTPRequestHandler):
                 self.send_json(500, {"error": f"Failed to trigger reconnect: {err}"})
             else:
                 clear_ip_cache()
+                record_reconnect()
                 self.send_json(200, {"action": "reconnect", "status": "success"})
 
         elif path in ("health", "v1/health"):
@@ -282,6 +315,92 @@ class APIHandler(BaseHTTPRequestHandler):
                 },
             })
 
+        elif path in ("diagnostics", "v1/diagnostics"):
+            now = time.time()
+            uptime = round(now - _start_time, 2)
+            started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(_start_time))
+            last_reconnect_iso = (
+                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(_last_reconnect_time))
+                if _last_reconnect_time
+                else None
+            )
+
+            bootstrap, b_err = get_tor_bootstrap_status()
+            socks_ready = check_socks5_ready()
+            ip, ip_err = get_current_ip()
+
+            resp, _ = send_tor_command("GETCONF DisableNetwork")
+            network_enabled = "DisableNetwork=0" in (resp or "")
+
+            with _metrics_lock:
+                rec_count = _reconnect_count
+
+            self.send_json(200, {
+                "uptime_seconds": uptime,
+                "started_at": started_at,
+                "last_reconnect_at": last_reconnect_iso,
+                "reconnect_count": rec_count,
+                "tor": {
+                    "network_enabled": network_enabled,
+                    "bootstrapped": bool(bootstrap and bootstrap.get("bootstrapped")),
+                    "progress": bootstrap.get("progress", 0) if bootstrap else 0,
+                    "summary": (
+                        bootstrap.get("summary", b_err or "Unknown")
+                        if bootstrap
+                        else (b_err or "Unknown")
+                    ),
+                },
+                "proxies": {
+                    "socks5_ready": socks_ready,
+                    "socks_port": SOCKS_PORT,
+                    "http_port": PROXY_PORT,
+                },
+                "egress": {
+                    "verified": bool(ip),
+                    "ip": ip,
+                    "error": ip_err if not ip else None,
+                },
+            })
+
+        elif path in ("metrics", "v1/metrics"):
+            now = time.time()
+            uptime = round(now - _start_time, 2)
+            bootstrap, _ = get_tor_bootstrap_status()
+            progress = bootstrap.get("progress", 0) if bootstrap else 0
+            bootstrapped = 1 if (bootstrap and bootstrap.get("bootstrapped")) else 0
+            socks_ready = 1 if check_socks5_ready() else 0
+
+            with _metrics_lock:
+                rec_count = _reconnect_count
+
+            metrics_lines = [
+                "# HELP torproxy_uptime_seconds Total container API uptime in seconds",
+                "# TYPE torproxy_uptime_seconds gauge",
+                f"torproxy_uptime_seconds {uptime}",
+                "",
+                "# HELP torproxy_reconnect_total Total circuit reconnect requests triggered",
+                "# TYPE torproxy_reconnect_total counter",
+                f"torproxy_reconnect_total {rec_count}",
+                "",
+                "# HELP torproxy_tor_bootstrapped Tor bootstrap status (1=done, 0=in progress)",
+                "# TYPE torproxy_tor_bootstrapped gauge",
+                f"torproxy_tor_bootstrapped {bootstrapped}",
+                "",
+                "# HELP torproxy_tor_bootstrap_progress Tor bootstrap progress percentage",
+                "# TYPE torproxy_tor_bootstrap_progress gauge",
+                f"torproxy_tor_bootstrap_progress {progress}",
+                "",
+                "# HELP torproxy_socks5_ready SOCKS5 listener probe (1=ready, 0=down)",
+                "# TYPE torproxy_socks5_ready gauge",
+                f"torproxy_socks5_ready {socks_ready}",
+                "",
+            ]
+            self.send_text(
+                200,
+                "\n".join(metrics_lines),
+                content_type="text/plain; version=0.0.4; charset=utf-8",
+            )
+
         else:
             self.send_json(404, {
                 "error": "Not Found",
@@ -292,6 +411,8 @@ class APIHandler(BaseHTTPRequestHandler):
                     "/disconnect",
                     "/reconnect",
                     "/health",
+                    "/diagnostics",
+                    "/metrics",
                 ],
             })
 

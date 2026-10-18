@@ -224,6 +224,8 @@ class TestAPIContract:
             "/disconnect",
             "/reconnect",
             "/health",
+            "/diagnostics",
+            "/metrics",
         ])
 
 

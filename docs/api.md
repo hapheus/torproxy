@@ -159,6 +159,65 @@ Additive diagnostic endpoint providing detailed readiness and component states w
 
 ---
 
+### GET `/diagnostics` (or `/v1/diagnostics`)
+Returns structured runtime diagnostics, process uptime, Tor circuit rebuild state, proxy readiness, and egress verification. Strictly omits any sensitive user data, client IPs, or Tor secrets.
+
+#### Response (200 OK)
+```json
+{
+  "uptime_seconds": 142.5,
+  "started_at": "2026-10-18T15:00:00Z",
+  "last_reconnect_at": "2026-10-18T15:05:00Z",
+  "reconnect_count": 1,
+  "tor": {
+    "network_enabled": true,
+    "bootstrapped": true,
+    "progress": 100,
+    "summary": "Done"
+  },
+  "proxies": {
+    "socks5_ready": true,
+    "socks_port": 9050,
+    "http_port": 8118
+  },
+  "egress": {
+    "verified": true,
+    "ip": "185.220.101.5",
+    "error": null
+  }
+}
+```
+
+---
+
+### GET `/metrics` (or `/v1/metrics`)
+Returns lightweight Prometheus exposition text metrics (`text/plain; version=0.0.4`).
+
+#### Response (200 OK)
+```text
+# HELP torproxy_uptime_seconds Total container API uptime in seconds
+# TYPE torproxy_uptime_seconds gauge
+torproxy_uptime_seconds 142.5
+
+# HELP torproxy_reconnect_total Total circuit reconnect requests triggered
+# TYPE torproxy_reconnect_total counter
+torproxy_reconnect_total 1
+
+# HELP torproxy_tor_bootstrapped Tor bootstrap status (1=done, 0=in progress)
+# TYPE torproxy_tor_bootstrapped gauge
+torproxy_tor_bootstrapped 1
+
+# HELP torproxy_tor_bootstrap_progress Tor bootstrap progress percentage
+# TYPE torproxy_tor_bootstrap_progress gauge
+torproxy_tor_bootstrap_progress 100
+
+# HELP torproxy_socks5_ready SOCKS5 listener probe (1=ready, 0=down)
+# TYPE torproxy_socks5_ready gauge
+torproxy_socks5_ready 1
+```
+
+---
+
 ### Unhandled Paths (404 Not Found)
 Any request to an unsupported path returns `404 Not Found`.
 
@@ -172,7 +231,9 @@ Any request to an unsupported path returns `404 Not Found`.
     "/connect",
     "/disconnect",
     "/reconnect",
-    "/health"
+    "/health",
+    "/diagnostics",
+    "/metrics"
   ]
 }
 ```
