@@ -138,3 +138,37 @@ class TestExamplesIntegrity:
         assert "## Quick start" in content or "## Quick start:" in content
         assert "docker compose down" in content
         assert "curl" in content
+
+
+@pytest.mark.unit
+class TestHardenedProductionExample:
+    """Validate hardened production compose configuration and documentation."""
+
+    def test_hardened_compose_structure(self):
+        compose_path = os.path.join(EXAMPLES_DIR, "hardened-production", "docker-compose.yml")
+        assert os.path.exists(compose_path), "Missing hardened-production docker-compose.yml"
+        with open(compose_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        assert "services" in data
+        assert "torproxy" in data["services"]
+        svc = data["services"]["torproxy"]
+        assert svc["image"] == "hapheus/torproxy:latest"
+        assert svc["security_opt"] == ["no-new-privileges:true"]
+        assert svc["cap_drop"] == ["ALL"]
+
+        # Check strict localhost port binding
+        for port_spec in svc["ports"]:
+            assert port_spec.startswith("127.0.0.1:"), f"Unsafe port binding: {port_spec}"
+
+    def test_hardened_readme_documentation(self):
+        readme_path = os.path.join(EXAMPLES_DIR, "hardened-production", "README.md")
+        assert os.path.exists(readme_path), "Missing hardened-production README.md"
+        with open(readme_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "## Architecture" in content
+        assert "## Prerequisites" in content
+        assert "## Quick start" in content
+        assert "docker compose down" in content
+        assert "curl" in content
+
