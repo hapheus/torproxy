@@ -133,6 +133,32 @@ Requests a new Tor circuit (`SIGNAL NEWNYM`) and invalidates the cached egress I
 
 ---
 
+### GET `/health` (or `/v1/health`)
+Additive diagnostic endpoint providing detailed readiness and component states without modifying existing `/status` consumers.
+
+#### Response (Healthy - 200 OK)
+```json
+{
+  "status": "healthy",
+  "tor": {
+    "network_enabled": true,
+    "bootstrapped": true,
+    "progress": 100,
+    "summary": "Done"
+  },
+  "proxies": {
+    "socks5": true
+  },
+  "egress": {
+    "verified": true,
+    "ip": "185.220.101.5",
+    "error": null
+  }
+}
+```
+
+---
+
 ### Unhandled Paths (404 Not Found)
 Any request to an unsupported path returns `404 Not Found`.
 
@@ -145,7 +171,8 @@ Any request to an unsupported path returns `404 Not Found`.
     "/ip",
     "/connect",
     "/disconnect",
-    "/reconnect"
+    "/reconnect",
+    "/health"
   ]
 }
 ```
@@ -155,6 +182,7 @@ Any request to an unsupported path returns `404 Not Found`.
 ## 3. IP Caching Semantics
 
 - **Time-to-Live (TTL):** 30 seconds.
-- **Cache Eviction:** Automatically invalidated whenever `/disconnect` or `/reconnect` is executed.
+- **Thread Safety:** Protected via an internal `threading.Lock` across concurrent handler threads.
+- **Cache Eviction:** Automatically invalidated whenever `/connect`, `/disconnect`, or `/reconnect` is executed.
 - **Verification Source:** Evaluated against `https://check.torproject.org/api/ip` through the local Privoxy proxy (`127.0.0.1:8118`).
 - **Egress Guarantee:** Egress verification strictly requires `IsTor: true` from the check service. Responses with `IsTor: false` or missing verification fields are rejected and never cached or reported as connected.
