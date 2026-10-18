@@ -68,6 +68,8 @@ The lightweight API server on port `8080` manages circuits and monitors health w
 | `/status`, `/` | `GET`, `POST` | `200` | Connection status and current exit IP. | `{"status":"connected","ip":"198.51.100.42"}` |
 | `/ip` | `GET` | `200`, `503` | Current verified Tor exit IP. Returns 503 while bootstrapping. | `{"ip":"198.51.100.42"}` |
 | `/health`, `/v1/health` | `GET` | `200`, `503` | Structured diagnostic health state across Tor, proxies, and egress. | `{"status":"healthy","tor":{"bootstrapped":true,"progress":100},"proxies":{"socks5":true},"egress":{"verified":true,"ip":"..."}}` |
+| `/diagnostics`, `/v1/diagnostics` | `GET` | `200` | Operational telemetry (uptime, reconnect counts, bootstrap progress). | `{"uptime_seconds":120,"reconnect_total":2,"tor":{"bootstrapped":true}}` |
+| `/metrics`, `/v1/metrics` | `GET` | `200` | Prometheus exposition format metrics for scrapers. | Plaintext Prometheus metrics. |
 | `/reconnect` | `POST` (or `GET`) | `200` | Request a new Tor circuit (`SIGNAL NEWNYM`). Clears IP cache. | `{"action":"reconnect","status":"success"}` |
 | `/disconnect` | `POST` (or `GET`) | `200` | Pause Tor network traffic (`DisableNetwork=1`). Fails closed. | `{"action":"disconnect","status":"success"}` |
 | `/connect` | `POST` (or `GET`) | `200` | Resume Tor network traffic (`DisableNetwork=0`). | `{"action":"connect","status":"success"}` |
@@ -120,6 +122,7 @@ Ready-to-run use cases with hardened configurations:
 
 | Example | Purpose | Guide |
 | ------- | ------- | ----- |
+| **Hardened Production** | Read-only rootfs, dropped capabilities, and memory-backed tmpfs. | [View Example](examples/hardened-production/) |
 | **Browserless Chromium** | Headless browser automation and scraping routed through Tor. | [View Example](examples/browserless-chromium-via-tor/) |
 | **CRW Web Scraper** | High-performance webpage-to-Markdown scraper via Tor proxy. | [View Example](examples/crw-web-scraper-via-tor/) |
 | **SearXNG Metasearch** | Private, self-hosted search engine routing upstream queries via Tor. | [View Example](examples/searxng-via-tor/) |
@@ -128,11 +131,12 @@ Ready-to-run use cases with hardened configurations:
 
 ## Security Model and Trust Boundaries
 
-- **Non-Root Execution**: Container processes run strictly under UID `999` (`toruser`).
+- **Non-Root Execution**: Container processes run strictly under the unprivileged system user `torproxy`.
 - **Authenticated ControlPort**: Tor's control port (`127.0.0.1:9051`) requires ephemeral filesystem cookie authentication (`CookieAuthentication 1`).
 - **Fail-Closed Guarantee**: If Tor disconnects or crashes, Privoxy drops traffic and returns HTTP 503 instead of leaking to clearnet.
 - **DNS Leak Prevention**: To prevent local DNS leaks, always use remote DNS resolution with SOCKS5 (`curl --socks5-hostname 127.0.0.1:9050` or `socks5h://`).
 - **Threat Model**: See [SECURITY.md](SECURITY.md) for vulnerability reporting procedures, threat boundaries, and anonymity limitations.
+- **Hardening Guide**: See [docs/hardening.md](docs/hardening.md) for read-only rootfs and dropped Linux capabilities.
 
 ---
 
@@ -141,6 +145,8 @@ Ready-to-run use cases with hardened configurations:
 - [docs/compatibility.md](docs/compatibility.md) — Absolute backward compatibility contract and frozen interfaces.
 - [docs/api.md](docs/api.md) — Exhaustive REST API specification and response schemas.
 - [docs/configuration.md](docs/configuration.md) — Configuration guide and startup validation rules.
+- [docs/hardening.md](docs/hardening.md) — Container runtime hardening, read-only rootfs, and dropped capabilities.
+- [docs/releases.md](docs/releases.md) — Semantic versioning policy, upgrade paths, and instant rollback procedures.
 - [docs/quality-baseline.md](docs/quality-baseline.md) — Measurable quality and performance baselines.
 
 ---

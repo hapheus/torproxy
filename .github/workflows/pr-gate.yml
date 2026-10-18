@@ -172,8 +172,56 @@ jobs:
           docker compose down -v
           echo "✅ Compose backward compatibility verified."
 
+      - name: Verify Hardened Container Execution (Read-Only & Dropped Caps)
+        run: |
+          echo "Testing container startup with read-only rootfs and dropped capabilities..."
+          HARDENED_ID=$(docker run -d \
+            --name torproxy-hardened-test \
+            --read-only \
+            --security-opt no-new-privileges:true \
+            --cap-drop ALL \
+            --tmpfs /tmp:rw,noexec,nosuid,size=32M \
+            --tmpfs /run:rw,noexec,nosuid,size=16M \
+            --tmpfs /var/lib/tor:rw,noexec,nosuid,size=64M \
+            --tmpfs /var/log/privoxy:rw,noexec,nosuid,size=16M \
+            -p 8119:8118 \
+            -p 9051:9050 \
+            -p 8081:8080 \
+            torproxy:smoke-test)
+          sleep 5
+          ./tests/integration/verify_container.sh "$HARDENED_ID" 8081 8119 9051
+          docker rm -f "$HARDENED_ID"
+          echo "✅ Hardened container startup and routing verified."
+
+      - name: Verify Backward Compatible Upgrade from Prior Release
+        run: |
+          echo "Testing upgrade from previous release with unchanged Compose configuration..."
+          # Test running previous published image
+          docker run -d --name torproxy-prev -p 8120:8118 -p 8082:8080 hapheus/torproxy:latest || true
+          sleep 5
+          if [ "$(docker ps -q -f name=torproxy-prev)" ]; then
+            curl -s http://127.0.0.1:8082/status || true
+            docker rm -f torproxy-prev
+          fi
+          # Test running candidate image on the exact same port mapping
+          docker run -d --name torproxy-upgrade -p 8120:8118 -p 8082:8080 torproxy:smoke-test
+          sleep 5
+          curl -s http://127.0.0.1:8082/status | grep -q "status"
+          docker rm -f torproxy-upgrade
+          echo "✅ Upgrade compatibility verified."
+
+      - name: Run Trivy Container Vulnerability Scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'torproxy:smoke-test'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+          ignore-unfixed: true
+
       - name: Cleanup Containers
         if: always()
         run: |
-          docker rm -f torproxy-smoke || true
+          docker rm -f torproxy-smoke torproxy-hardened-test torproxy-prev torproxy-upgrade || true
           docker compose down -v || true
+

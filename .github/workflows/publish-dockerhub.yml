@@ -47,5 +47,18 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Update Docker Hub Description
+        uses: peter-evans/dockerhub-description@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          username: hapheus
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: hapheus/torproxy
+          readme-filepath: ./DOCKERHUB.md
+          short-description: "Lightweight, secure Docker HTTP/SOCKS5 Tor proxy with local REST control API"
+

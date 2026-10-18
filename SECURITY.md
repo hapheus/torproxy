@@ -39,7 +39,7 @@ Please **do not** report security vulnerabilities via public GitHub issues.
 ## Threat Model and Trust Boundaries
 
 ### 1. Local Container Security Boundary
-- **Non-Root Execution**: The container runs under a dedicated unprivileged user (`toruser`, UID 999), never as `root` (UID 0).
+- **Non-Root Execution**: The container runs under a dedicated unprivileged system user (`torproxy`), never as `root` (UID 0).
 - **Control Port Authentication**: Tor's internal ControlPort (`127.0.0.1:9051`) requires authentication using an ephemeral filesystem cookie (`CookieAuthentication 1`). The cookie file permissions are restricted to the non-root container user (`0600`).
 - **Loopback Internal Services**: Tor ControlPort listens strictly on loopback inside the container and is never exposed or published.
 
@@ -62,3 +62,29 @@ Please **do not** report security vulnerabilities via public GitHub issues.
 - **No 100% Anonymity Guarantee**: Tor is an overlay network designed to conceal network routing. It does not strip application-level tracking cookies, browser fingerprints, or plaintext payloads.
 - **Always Use HTTPS**: Plaintext HTTP traffic exiting a Tor exit relay can be monitored by the exit node operator. Always use `https://` for sensitive data.
 - **Latency & Reliability**: Tor circuits incur variable latency and occasional connection drops. Circuit rotation (`/reconnect`) requests a fresh circuit from Tor via `SIGNAL NEWNYM`, but does not guarantee a distinct exit IP address if Tor's circuit pool is constrained.
+
+---
+
+## Vulnerability Management and Scanning Policy
+
+To protect users against upstream vulnerabilities and supply chain compromises:
+
+1. **Continuous Automated Scanning**:
+   - Every pull request and merge to `main` undergoes container vulnerability scanning using Trivy.
+   - Images are evaluated against standard CVE databases (Debian Security Advisories, NVD).
+2. **Triage Severity SLA**:
+   - **Critical & High**: Addressed within 7 business days via base image update or upstream package bump.
+   - **Medium & Low**: Triaged during regular monthly release cycles.
+3. **False Positive & Exception Process**:
+   - Any accepted risk or scanner false-positive must be documented in a `.trivyignore` file with an issue link, rationale, and expiration date.
+4. **Base Image Updates**:
+   - The container builds upon `debian:bookworm-slim`. Security patches for `tor`, `privoxy`, `curl`, and `ca-certificates` are pulled directly from Debian security mirrors during build.
+
+---
+
+## Supply Chain Security and Provenance
+
+- **Reproducible Multi-Arch Builds**: Images are built using Docker Buildx for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
+- **Software Bill of Materials (SBOM)**: Release builds generate automated SBOM metadata (SPDX format) embedded in the image attestation.
+- **Provenance Attestations**: Docker Buildx generates SLSA provenance attestations (`mode=max`) guaranteeing build integrity from GitHub Actions.
+- **Minimal Dependencies**: The image intentionally contains no node runtime, pip packages, or third-party binaries. Privoxy, Tor, and standard library Python 3 constitute the entire execution stack.
