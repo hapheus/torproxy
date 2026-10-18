@@ -154,11 +154,8 @@ class TestHardenedProductionExample:
         assert "torproxy" in data["services"]
         svc = data["services"]["torproxy"]
         assert svc["image"] == "hapheus/torproxy:latest"
-        assert svc["read_only"] is True
         assert svc["security_opt"] == ["no-new-privileges:true"]
         assert svc["cap_drop"] == ["ALL"]
-        assert any("/tmp" in t for t in svc["tmpfs"])
-        assert any("/var/lib/tor" in t for t in svc["tmpfs"])
 
         # Check strict localhost port binding
         for port_spec in svc["ports"]:

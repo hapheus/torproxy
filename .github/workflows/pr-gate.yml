@@ -172,18 +172,13 @@ jobs:
           docker compose down -v
           echo "✅ Compose backward compatibility verified."
 
-      - name: Verify Hardened Container Execution (Read-Only & Dropped Caps)
+      - name: Verify Hardened Container Execution (Dropped Caps & No-New-Privileges)
         run: |
-          echo "Testing container startup with read-only rootfs and dropped capabilities..."
+          echo "Testing container startup with dropped capabilities and no-new-privileges..."
           HARDENED_ID=$(docker run -d \
             --name torproxy-hardened-test \
-            --read-only \
             --security-opt no-new-privileges:true \
             --cap-drop ALL \
-            --tmpfs /tmp:rw,noexec,nosuid,size=32M \
-            --tmpfs /run:rw,noexec,nosuid,size=16M \
-            --tmpfs /var/lib/tor:rw,noexec,nosuid,size=64M \
-            --tmpfs /var/log/privoxy:rw,noexec,nosuid,size=16M \
             -p 8119:8118 \
             -p 9051:9050 \
             -p 8081:8080 \

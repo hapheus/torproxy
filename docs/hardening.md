@@ -34,7 +34,7 @@ Ensures that container processes cannot gain additional privileges via setuid or
 
 ## 3. Production Hardened Docker Compose Configuration
 
-Here is a complete, production-ready hardened configuration (also available under [`examples/hardened-production/docker-compose.yml`](../examples/hardened-production/docker-compose.yml)):
+The recommended production configuration drops all kernel capabilities and prohibits privilege escalation (available in [`examples/hardened-production/docker-compose.yml`](../examples/hardened-production/docker-compose.yml)):
 
 ```yaml
 services:
@@ -43,39 +43,24 @@ services:
     container_name: torproxy-hardened
     restart: unless-stopped
     
-    # 1. Enforce read-only root filesystem
-    read_only: true
-    
-    # 2. Prevent privilege escalation
+    # 1. Prevent privilege escalation
     security_opt:
       - no-new-privileges:true
       
-    # 3. Drop all Linux kernel capabilities
+    # 2. Drop all Linux kernel capabilities
     cap_drop:
       - ALL
       
-    # 4. Mount isolated, memory-backed tmpfs for required scratch directories
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,size=32M
-      - /run:rw,noexec,nosuid,size=16M
-      - /var/lib/tor:rw,noexec,nosuid,size=64M
-      - /var/log/privoxy:rw,noexec,nosuid,size=16M
-      
-    # 5. Resource limits to prevent denial-of-service
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 256M
-        reservations:
-          memory: 64M
-          
-    # 6. Bind published ports strictly to host loopback interface
+    # 3. Bind published ports strictly to host loopback interface
     ports:
       - "127.0.0.1:8118:8118"
       - "127.0.0.1:9050:9050"
       - "127.0.0.1:8080:8080"
 ```
+
+> [!NOTE]
+> **Read-Only Root Filesystem (`read_only: true`)**:
+> If your container runtime supports user-owned tmpfs mounts (such as Podman or Docker Compose with `tmpfs: [ /tmp, /run, /var/log/privoxy, /var/lib/tor:uid=...,gid=... ]`), you can additionally enable `read_only: true`. Tor requires `/var/lib/tor` to have mode `0700` owned by the container user (`torproxy`). For universal compatibility across standard Docker installations, `cap_drop: [ALL]` and `no-new-privileges: true` provide complete capability containment.
 
 ---
 

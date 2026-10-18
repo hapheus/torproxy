@@ -3,16 +3,10 @@ services:
     image: hapheus/torproxy:latest
     container_name: torproxy-hardened
     restart: unless-stopped
-    read_only: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,size=32M
-      - /run:rw,noexec,nosuid,size=16M
-      - /var/lib/tor:rw,noexec,nosuid,size=64M
-      - /var/log/privoxy:rw,noexec,nosuid,size=16M
     ports:
       - "127.0.0.1:8118:8118"
       - "127.0.0.1:9050:9050"

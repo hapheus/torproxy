@@ -13,10 +13,10 @@ This example demonstrates how to run `torproxy` in production with maximum secur
  ┌─────────────────────────────────────────────────────────────┐
  │ torproxy Container (Hardened Sandbox)                       │
  │                                                             │
- │  • read_only: true (Immutable root filesystem)              │
- │  • cap_drop: [ALL] (No kernel privileges)                   │
+ │  • Non-root system user: torproxy                           │
+ │  • cap_drop: [ALL] (No Linux kernel privileges)             │
  │  • security_opt: [no-new-privileges:true]                   │
- │  • Isolated memory tmpfs: /tmp, /run, /var/lib/tor, etc.    │
+ │  • Strict loopback port binding (127.0.0.1)                 │
  │                                                             │
  │  Privoxy (8118) ───► Tor SOCKS5 (9050) ───► Tor Network     │
  │                           ▲                                 │
@@ -48,11 +48,16 @@ This example demonstrates how to run `torproxy` in production with maximum secur
 
 3. Verify security constraints:
    ```bash
-   # Attempting to write to the read-only rootfs should fail:
-   docker exec torproxy-hardened touch /etc/hacked.txt || echo "Blocked by read-only rootfs"
+   # Verify non-root user execution:
+   docker exec torproxy-hardened id -u
 
    # Verify dropped capabilities:
    docker inspect --format '{{.HostConfig.CapDrop}}' torproxy-hardened
+   # Output: [ALL]
+
+   # Verify no-new-privileges:
+   docker inspect --format '{{.HostConfig.SecurityOpt}}' torproxy-hardened
+   # Output: [no-new-privileges:true]
    ```
 
 4. Clean up:
