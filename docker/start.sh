@@ -38,11 +38,12 @@ validate_configuration() {
 }
 
 shutdown() {
+  echo "[start.sh] Shutting down child processes (Tor, Privoxy, API)..." >&2
   kill -TERM "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" 2>/dev/null || true
   wait "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" 2>/dev/null || true
 }
 
-trap shutdown EXIT
+trap shutdown SIGTERM SIGINT EXIT
 
 validate_configuration
 sed \

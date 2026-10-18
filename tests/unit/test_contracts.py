@@ -223,6 +223,7 @@ class TestAPIContract:
             "/connect",
             "/disconnect",
             "/reconnect",
+            "/health",
         ])
 
 

@@ -2,6 +2,8 @@
 import json
 import os
 import re
+import socket
+import threading
 import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,9 +12,11 @@ import tor_control
 
 API_PORT = int(os.environ.get("TORPROXY_API_PORT", "8080"))
 PROXY_PORT = int(os.environ.get("TORPROXY_LISTEN_PORT", "8118"))
+SOCKS_PORT = int(os.environ.get("TORPROXY_SOCKS_PORT", "9050"))
 
 # IP Caching configuration
 IP_CACHE_TTL = 30  # seconds
+_cache_lock = threading.Lock()
 _cached_ip = None
 _cached_ip_time = 0
 
@@ -23,15 +27,32 @@ def send_tor_command(command):
 
 def clear_ip_cache():
     global _cached_ip, _cached_ip_time
-    _cached_ip = None
-    _cached_ip_time = 0
+    with _cache_lock:
+        _cached_ip = None
+        _cached_ip_time = 0
+
+
+def check_socks5_ready(port=None, timeout=1.5):
+    """Verifies that Tor's SOCKS5 proxy accepts connections and completes a handshake."""
+    target_port = port or SOCKS_PORT
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            s.connect(("127.0.0.1", target_port))
+            # SOCKS5 greeting: version 5, 1 auth method (0x00 = No authentication)
+            s.sendall(b"\x05\x01\x00")
+            resp = s.recv(2)
+            return resp == b"\x05\x00"
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def get_current_ip():
     global _cached_ip, _cached_ip_time
     now = time.time()
-    if _cached_ip and (now - _cached_ip_time < IP_CACHE_TTL):
-        return _cached_ip, None
+    with _cache_lock:
+        if _cached_ip and (now - _cached_ip_time < IP_CACHE_TTL):
+            return _cached_ip, None
 
     proxy_support = urllib.request.ProxyHandler({
         "http": f"http://127.0.0.1:{PROXY_PORT}",
@@ -56,8 +77,9 @@ def get_current_ip():
         # lowercase variant as well for compatibility with equivalent APIs.
         ip = data.get("IP") or data.get("ip")
         if ip:
-            _cached_ip = ip
-            _cached_ip_time = now
+            with _cache_lock:
+                _cached_ip = ip
+                _cached_ip_time = now
             return ip, None
         return None, "No IP key in response"
     except Exception as e:  # noqa: BLE001
@@ -163,6 +185,7 @@ class APIHandler(BaseHTTPRequestHandler):
             if err:
                 self.send_json(500, {"error": f"Failed to enable Tor network: {err}"})
             else:
+                clear_ip_cache()
                 self.send_json(200, {"action": "connect", "status": "success"})
 
         elif path == "disconnect":
@@ -181,10 +204,95 @@ class APIHandler(BaseHTTPRequestHandler):
                 clear_ip_cache()
                 self.send_json(200, {"action": "reconnect", "status": "success"})
 
+        elif path in ("health", "v1/health"):
+            resp, err = send_tor_command("GETCONF DisableNetwork")
+            if err:
+                self.send_json(503, {
+                    "status": "unhealthy",
+                    "error": f"Failed to query Tor control: {err}",
+                })
+                return
+
+            network_enabled = "DisableNetwork=0" in resp
+            if not network_enabled:
+                self.send_json(200, {
+                    "status": "disconnected",
+                    "tor": {
+                        "network_enabled": False,
+                        "bootstrapped": False,
+                        "progress": 0,
+                    },
+                    "proxies": {
+                        "socks5": False,
+                    },
+                    "egress": {
+                        "verified": False,
+                        "ip": None,
+                    },
+                })
+                return
+
+            bootstrap, b_err = get_tor_bootstrap_status()
+            bootstrapped = bool(bootstrap and bootstrap.get("bootstrapped"))
+            socks_ready = check_socks5_ready()
+
+            if not bootstrapped:
+                progress = bootstrap.get("progress", 0) if bootstrap else 0
+                summary = (
+                    bootstrap.get("summary", b_err or "Bootstrapping")
+                    if bootstrap
+                    else (b_err or "Unknown")
+                )
+                self.send_json(200, {
+                    "status": "bootstrapping",
+                    "tor": {
+                        "network_enabled": True,
+                        "bootstrapped": False,
+                        "progress": progress,
+                        "summary": summary,
+                    },
+                    "proxies": {
+                        "socks5": socks_ready,
+                    },
+                    "egress": {
+                        "verified": False,
+                        "ip": None,
+                    },
+                })
+                return
+
+            ip, ip_err = get_current_ip()
+            overall_status = "healthy" if ip and socks_ready else "degraded"
+
+            self.send_json(200, {
+                "status": overall_status,
+                "tor": {
+                    "network_enabled": True,
+                    "bootstrapped": True,
+                    "progress": 100,
+                    "summary": "Done",
+                },
+                "proxies": {
+                    "socks5": socks_ready,
+                },
+                "egress": {
+                    "verified": bool(ip),
+                    "ip": ip,
+                    "error": ip_err if not ip else None,
+                },
+            })
+
         else:
             self.send_json(404, {
                 "error": "Not Found",
-                "supported_paths": ["/status", "/ip", "/connect", "/disconnect", "/reconnect"],
+                "supported_paths": [
+                    "/status",
+                    "/ip",
+                    "/connect",
+                    "/disconnect",
+                    "/reconnect",
+                    "/health",
+                ],
             })
 
 
