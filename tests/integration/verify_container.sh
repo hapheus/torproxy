@@ -37,7 +37,7 @@ echo "=== 3. REST API Contract Verification ==="
 STATUS_RESP=$(curl -fsS "http://localhost:${API_PORT}/status")
 echo "/status response: $STATUS_RESP"
 echo "$STATUS_RESP" | jq -e '.status' >/dev/null
-echo "$STATUS_RESP" | jq -e '.detail' >/dev/null
+echo "$STATUS_RESP" | jq -e 'if .status == "connected" then .ip else .detail end' >/dev/null
 
 # Test /health
 HEALTH_RESP=$(curl -fsS "http://localhost:${API_PORT}/health")

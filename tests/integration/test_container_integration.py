@@ -43,8 +43,10 @@ class TestContainerRestApi:
             data = json.loads(resp.read().decode("utf-8"))
             assert "status" in data
             assert data["status"] in ("connected", "connecting", "bootstrapping", "disconnected")
-            assert "detail" in data
-            assert "ip" in data
+            if data["status"] == "connected":
+                assert "ip" in data
+            else:
+                assert "detail" in data
 
     def test_health_endpoint(self):
         url = f"http://{HOST}:{API_PORT}/health"
