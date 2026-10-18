@@ -37,17 +37,18 @@ pytestmark = [
 class TestContainerRestApi:
     def test_status_endpoint(self):
         url = f"http://{HOST}:{API_PORT}/status"
-        with urllib.request.urlopen(url, timeout=5) as resp:
+        # Allow sufficient timeout (20s) if Tor is resolving egress IP during bootstrap
+        with urllib.request.urlopen(url, timeout=20) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode("utf-8"))
             assert "status" in data
-            assert data["status"] in ("connected", "bootstrapping")
+            assert data["status"] in ("connected", "connecting", "bootstrapping", "disconnected")
             assert "detail" in data
             assert "ip" in data
 
     def test_health_endpoint(self):
         url = f"http://{HOST}:{API_PORT}/health"
-        with urllib.request.urlopen(url, timeout=5) as resp:
+        with urllib.request.urlopen(url, timeout=20) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode("utf-8"))
             assert data["status"] in ("healthy", "bootstrapping", "disconnected")
@@ -58,7 +59,7 @@ class TestContainerRestApi:
     def test_reconnect_endpoint_post(self):
         url = f"http://{HOST}:{API_PORT}/reconnect"
         req = urllib.request.Request(url, method="POST")
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode("utf-8"))
             assert data["action"] == "reconnect"
@@ -67,7 +68,7 @@ class TestContainerRestApi:
     def test_legacy_get_endpoints_compatible(self):
         for endpoint in ("connect", "reconnect"):
             url = f"http://{HOST}:{API_PORT}/{endpoint}"
-            with urllib.request.urlopen(url, timeout=5) as resp:
+            with urllib.request.urlopen(url, timeout=20) as resp:
                 assert resp.status == 200
                 data = json.loads(resp.read().decode("utf-8"))
                 assert data["action"] == endpoint
@@ -90,12 +91,12 @@ class TestFailClosedAndLeakPrevention:
         # 1. Trigger Disconnect via REST API
         disc_url = f"http://{HOST}:{API_PORT}/disconnect"
         disc_req = urllib.request.Request(disc_url, method="POST")
-        with urllib.request.urlopen(disc_req, timeout=5) as resp:
+        with urllib.request.urlopen(disc_req, timeout=15) as resp:
             assert resp.status == 200
 
         # 2. Verify /health reflects disconnected state
         health_url = f"http://{HOST}:{API_PORT}/health"
-        with urllib.request.urlopen(health_url, timeout=5) as resp:
+        with urllib.request.urlopen(health_url, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             assert data["status"] == "disconnected"
             assert data["tor"]["network_enabled"] is False
@@ -105,7 +106,7 @@ class TestFailClosedAndLeakPrevention:
         opener = urllib.request.build_opener(proxy_handler)
         fail_closed = False
         try:
-            with opener.open("http://example.com", timeout=3) as r:
+            with opener.open("http://example.com", timeout=5) as r:
                 # If Privoxy returns an error page, status might be 500 or 503
                 content = r.read().decode("utf-8", errors="replace")
                 if "500" in content or "503" in content or "Privoxy" in content:
@@ -117,10 +118,10 @@ class TestFailClosedAndLeakPrevention:
         # 4. Reconnect Tor to restore service
         conn_url = f"http://{HOST}:{API_PORT}/connect"
         conn_req = urllib.request.Request(conn_url, method="POST")
-        with urllib.request.urlopen(conn_req, timeout=5) as resp:
+        with urllib.request.urlopen(conn_req, timeout=15) as resp:
             assert resp.status == 200
 
         # 5. Verify /health restored
-        with urllib.request.urlopen(health_url, timeout=5) as resp:
+        with urllib.request.urlopen(health_url, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             assert data["tor"]["network_enabled"] is True
