@@ -211,7 +211,7 @@ jobs:
           echo "✅ Upgrade compatibility verified."
 
       - name: Run Trivy Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: 'torproxy:smoke-test'
           format: 'table'
