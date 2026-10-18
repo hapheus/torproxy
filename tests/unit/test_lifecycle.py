@@ -143,6 +143,30 @@ class TestHealthDiagnosticEndpoint:
                 assert data["tor"]["progress"] == 40
                 assert data["proxies"]["socks5"] is False
 
+    def test_health_endpoint_control_error(self, api_server):
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = (None, "Socket connection failed")
+
+            req = urllib.request.Request(f"{api_server}/health", method="GET")
+            with pytest.raises(urllib.error.HTTPError) as exc_info:
+                urllib.request.urlopen(req)
+            assert exc_info.value.code == 503
+            data = json.loads(exc_info.value.read().decode("utf-8"))
+            assert data["status"] == "unhealthy"
+            assert "Socket connection failed" in data["error"]
+
+    def test_health_endpoint_network_disabled(self, api_server):
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = ("250 DisableNetwork=1", None)
+
+            req = urllib.request.Request(f"{api_server}/health", method="GET")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                data = json.loads(resp.read().decode("utf-8"))
+                assert data["status"] == "disconnected"
+                assert data["tor"]["network_enabled"] is False
+                assert data["proxies"]["socks5"] is False
+
 
 @pytest.mark.unit
 class TestProcessSupervisionTrap:
