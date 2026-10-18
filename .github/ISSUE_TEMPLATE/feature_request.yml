@@ -1,0 +1,35 @@
+name: Feature Request
+description: Propose an idea or enhancement for torproxy
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remember our absolute compatibility contract: **NO BREAKING CHANGES**.
+        Proposals must be backward-compatible with existing Compose files, environment variables, and ports.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you would like to see implemented.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility Analysis
+      description: Explain how this feature preserves existing interfaces and defaults.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or features considered.
