@@ -47,7 +47,7 @@ docker run -d --name torproxy --restart unless-stopped \
 
 When the container launches, `/usr/local/bin/start.sh` executes the following sequence:
 
-1. **Validation:** Checks that `TORPROXY_LISTEN_ADDRESS` is a valid IPv4 address and that all specified port variables are integers between `1` and `65535`.
+1. **Validation:** Checks that `TORPROXY_LISTEN_ADDRESS` has 4 valid octets (0–255), all ports are integers (1–65535), and no port conflicts exist between Privoxy, API, and SOCKS5.
 2. **Template Substitution:**
    - Replaces `__TORPROXY_LISTEN_ADDRESS__`, `__TORPROXY_LISTEN_PORT__`, and `__TORPROXY_SOCKS_PORT__` in `/etc/privoxy/config.template` and writes `/tmp/privoxy.config`.
    - Replaces `__TORPROXY_SOCKS_PORT__` in `/etc/tor/torrc` and writes `/tmp/torrc`.
@@ -62,5 +62,5 @@ When the container launches, `/usr/local/bin/start.sh` executes the following se
 ## 4. Network Exposure & Security Boundaries
 
 - **Host Loopback Only:** By default, Docker Compose exposes ports `8118`, `8080`, and `9050` bound exclusively to `127.0.0.1`. Never expose these ports to `0.0.0.0` or public internet interfaces without an authenticating reverse proxy.
-- **Docker Network Isolation:** Containers within the same Docker network can communicate with `torproxy` using the service hostname `torproxy` (e.g. `http://torproxy:8118`).
-- **Tor Control Port (`9051`):** Bound strictly to `127.0.0.1:9051` inside the container. It is never exposed outside the container boundary.
+- **Docker Network Isolation:** Containers within the same Docker network can communicate with `torproxy` using the service hostname `torproxy` (e.g. `http://torproxy:8118`). Shipped examples do not publish the management API to host ports.
+- **Tor Control Port (`9051`):** Bound strictly to `127.0.0.1:9051` inside the container. It is authenticated via `CookieAuthentication 1` (`/var/lib/tor/control_auth_cookie`) and is never exposed outside the container boundary.

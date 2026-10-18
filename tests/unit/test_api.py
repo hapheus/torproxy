@@ -41,7 +41,7 @@ class TestTorControlProtocol:
         resp, err = api.send_tor_command("GETCONF DisableNetwork")
 
         assert resp is None
-        assert err == "Tor control authentication failed"
+        assert "Tor control authentication failed" in err
 
     @patch("socket.socket")
     def test_send_tor_command_socket_timeout(self, mock_socket_class):
@@ -150,7 +150,7 @@ class TestIPResolutionAndCaching:
     @patch("urllib.request.build_opener")
     def test_get_current_ip_lowercase_key(self, mock_build_opener):
         mock_resp = MagicMock()
-        mock_resp.read.return_value = b'{"ip": "203.0.113.20"}'
+        mock_resp.read.return_value = b'{"ip": "203.0.113.20", "IsTor": true}'
         mock_opener = MagicMock()
         mock_opener.open.return_value = mock_resp
         mock_build_opener.return_value = mock_opener
@@ -161,9 +161,36 @@ class TestIPResolutionAndCaching:
         assert err is None
 
     @patch("urllib.request.build_opener")
+    def test_get_current_ip_rejects_is_tor_false(self, mock_build_opener):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"IP": "203.0.113.30", "IsTor": false}'
+        mock_opener = MagicMock()
+        mock_opener.open.return_value = mock_resp
+        mock_build_opener.return_value = mock_opener
+
+        ip, err = api.get_current_ip()
+
+        assert ip is None
+        assert "IsTor=false" in err
+        assert api._cached_ip is None
+
+    @patch("urllib.request.build_opener")
+    def test_get_current_ip_missing_is_tor_confirmation(self, mock_build_opener):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"IP": "203.0.113.40"}'
+        mock_opener = MagicMock()
+        mock_opener.open.return_value = mock_resp
+        mock_build_opener.return_value = mock_opener
+
+        ip, err = api.get_current_ip()
+
+        assert ip is None
+        assert "missing IsTor" in err
+
+    @patch("urllib.request.build_opener")
     def test_get_current_ip_missing_key(self, mock_build_opener):
         mock_resp = MagicMock()
-        mock_resp.read.return_value = b'{"status": "ok"}'
+        mock_resp.read.return_value = b'{"status": "ok", "IsTor": true}'
         mock_opener = MagicMock()
         mock_opener.open.return_value = mock_resp
         mock_build_opener.return_value = mock_opener

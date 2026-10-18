@@ -15,7 +15,7 @@ RUN apt-get update \
 
 COPY --chmod=755 start.sh /usr/local/bin/start.sh
 COPY --chmod=755 healthcheck.sh /usr/local/bin/healthcheck.sh
-COPY --chmod=755 api.py /usr/local/bin/api.py
+COPY --chmod=755 api.py tor_control.py /usr/local/bin/
 COPY privoxy.config.template /etc/privoxy/config.template
 COPY torrc /etc/tor/torrc
 

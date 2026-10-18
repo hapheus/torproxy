@@ -2,10 +2,11 @@
 import json
 import os
 import re
-import socket
 import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import tor_control
 
 API_PORT = int(os.environ.get("TORPROXY_API_PORT", "8080"))
 PROXY_PORT = int(os.environ.get("TORPROXY_LISTEN_PORT", "8118"))
@@ -17,20 +18,7 @@ _cached_ip_time = 0
 
 
 def send_tor_command(command):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(3)
-            s.connect(("127.0.0.1", 9051))
-            s.sendall(b"AUTHENTICATE\r\n")
-            resp = s.recv(1024)
-            if b"250" not in resp:
-                return None, "Tor control authentication failed"
-
-            s.sendall(command.encode("utf-8") + b"\r\n")
-            resp = s.recv(1024)
-            return resp.decode("utf-8"), None
-    except Exception as e:  # noqa: BLE001
-        return None, str(e)
+    return tor_control.send_command(command)
 
 
 def clear_ip_cache():
@@ -54,6 +42,16 @@ def get_current_ip():
         # 3 seconds timeout to keep API responsive
         response = opener.open("https://check.torproject.org/api/ip", timeout=3)
         data = json.loads(response.read().decode("utf-8"))
+
+        is_tor = data.get("IsTor")
+        if is_tor is None:
+            is_tor = data.get("is_tor")
+
+        if is_tor is False:
+            return None, "Tor check service reported traffic NOT routed through Tor (IsTor=false)"
+        if is_tor is not True:
+            return None, "Tor check service response missing IsTor confirmation"
+
         # check.torproject.org uses an uppercase "IP" key. Accept the
         # lowercase variant as well for compatibility with equivalent APIs.
         ip = data.get("IP") or data.get("ip")
