@@ -1,168 +1,162 @@
-# torproxy — Minimal Tor HTTP & SOCKS5 Proxy for Docker
+# torproxy — Minimal, Production-Grade Tor HTTP & SOCKS5 Proxy for Docker
 
-A minimal Tor HTTP and SOCKS5 proxy for Docker. torproxy routes proxy traffic through the Tor network, works with sensible defaults, and includes a local REST API and Docker health check for reliable automation. The HTTP proxy listens on port `8118`, SOCKS5 on port `9050`, and the API on port `8080`.
+[![PR Quality & Smoke Gate](https://github.com/hapheus/torproxy/actions/workflows/pr-gate.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/pr-gate.yml)
+[![Daily Live Image Verification](https://github.com/hapheus/torproxy/actions/workflows/daily-image-verification.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/daily-image-verification.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Simple, secure Tor for Docker
+A minimal, secure, and reliable Tor HTTP and SOCKS5 proxy packaged for Docker. `torproxy` routes traffic through the Tor network with fail-closed protection, non-root execution, an authenticated Tor control interface, and a lightweight JSON REST API for circuit rotation and health monitoring.
 
-torproxy is deliberately focused: provide an HTTP proxy that routes traffic through Tor, without a large configuration surface or complex startup parameters. It is designed for Docker users who want a dependable service that is easy to run, automate, and monitor.
+---
 
-- **Minimal setup:** start it with Docker Compose or one `docker run` command.
-- **Ready-aware health check:** the container is healthy only when Tor is connected and the proxy is usable.
-- **Small REST API:** check the connection and connect, disconnect, or request a new circuit without using the Tor Control Protocol directly.
-- **Safe local defaults:** proxy and API bind to localhost by default; Tor's internal services remain private inside the container.
-- **Docker-native operation:** simple networking, restart policy support, and no unnecessary configuration.
+## Architecture
 
-The result is a small Docker Tor proxy that fits cleanly into scripts, CI/CD jobs, monitoring, Home Assistant, n8n, and Docker Compose stacks.
+```text
+Host Client / Dependent Containers
+        │
+        ├── HTTP Requests ────────► Privoxy (:8118)
+        │                             │ (forward-socks5t)
+        ├── SOCKS5 Requests ──────────┼───────────────► Tor Daemon (:9050)
+        │                             │                   │
+        └── REST Control API ─────► API Server (:8080)   │ (Cookie Auth)
+                                      │                   │
+                                      └─ ControlPort ─────┘ (:9051 loopback)
+                                                          │
+                                                          ▼
+                                                  Tor Onion Network
+                                                          ▼
+                                                    Target Website
+```
 
-## Why use Tor?
+---
 
-Tor sends requests through several independent servers before they reach their destination. As a result, the destination sees a Tor exit IP address instead of your normal public IP address. This can improve privacy when an application needs to use an HTTP proxy.
-
-> **Note:** Tor is not a guarantee of anonymity and does not protect data sent without encryption. Use `https://` whenever possible. Because traffic takes a longer route, websites and downloads can be noticeably slower than with a normal internet connection.
-
-## Quick start
+## Quick Start
 
 ```sh
+# 1. Start torproxy in the background
 docker compose up -d
+
+# 2. Test HTTP proxy (port 8118)
 curl -v -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
+
+# 3. Test SOCKS5 proxy with remote DNS resolution (port 9050)
 curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+
+# 4. Check status via the local REST API
+curl http://127.0.0.1:8080/status
 ```
 
-Compose makes all ports available only on this computer (`127.0.0.1`). This is intentional: neither proxy nor the control API has a password.
+> **Security Note:** In `docker-compose.yml`, all ports bind strictly to `127.0.0.1` by default. Neither the proxy listeners nor the management API require authentication; do not expose them to untrusted networks.
 
-## Usage
+---
 
-Configure software that supports an HTTP proxy with:
+## Available Interfaces and Ports
 
-| Setting | Value |
-| --- | --- |
-| Host | `127.0.0.1` |
-| Port | `8118` |
-| Scheme | `http` |
+| Interface | Default Port | Internal Service | Description |
+| --------- | ------------ | ---------------- | ----------- |
+| **HTTP Proxy** | `8118` | Privoxy | HTTP/HTTPS forward proxy routing traffic to Tor. Fails closed (500/503) if Tor is disconnected. |
+| **SOCKS5 Proxy** | `9050` | Tor | Direct Tor SOCKS5 listener. Supports remote DNS resolution via `socks5h://`. |
+| **REST API** | `8080` | Python `api.py` | JSON management and health endpoint. Circuit rotation and connection management. |
 
-For SOCKS5-aware software, use `127.0.0.1:9050`. The SOCKS5 port resolves host names through Tor; with curl, use `--socks5-hostname`:
+---
 
-```sh
-curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
-```
+## REST API Reference
 
-For a direct Docker run:
+The lightweight API server on port `8080` manages circuits and monitors health without requiring clients to implement the Tor Control Protocol.
 
-```sh
-docker run -d --name torproxy --restart unless-stopped \
-  -p 127.0.0.1:8118:8118 \
-  -p 127.0.0.1:8080:8080 \
-  -p 127.0.0.1:9050:9050 \
-  hapheus/torproxy:latest
-```
+| Endpoint | Method | Status Code | Purpose | Example Response |
+| -------- | ------ | ----------- | ------- | ---------------- |
+| `/status`, `/` | `GET`, `POST` | `200` | Connection status and current exit IP. | `{"status":"connected","ip":"198.51.100.42"}` |
+| `/ip` | `GET` | `200`, `503` | Current verified Tor exit IP. Returns 503 while bootstrapping. | `{"ip":"198.51.100.42"}` |
+| `/health`, `/v1/health` | `GET` | `200`, `503` | Structured diagnostic health state across Tor, proxies, and egress. | `{"status":"healthy","tor":{"bootstrapped":true,"progress":100},"proxies":{"socks5":true},"egress":{"verified":true,"ip":"..."}}` |
+| `/reconnect` | `POST` (or `GET`) | `200` | Request a new Tor circuit (`SIGNAL NEWNYM`). Clears IP cache. | `{"action":"reconnect","status":"success"}` |
+| `/disconnect` | `POST` (or `GET`) | `200` | Pause Tor network traffic (`DisableNetwork=1`). Fails closed. | `{"action":"disconnect","status":"success"}` |
+| `/connect` | `POST` (or `GET`) | `200` | Resume Tor network traffic (`DisableNetwork=0`). | `{"action":"connect","status":"success"}` |
 
-### Use from other Docker containers
+> **HTTP Methods:** `POST` is recommended for state mutations (`/reconnect`, `/disconnect`, `/connect`). Legacy `GET` calls remain fully supported for backward compatibility.
+> Detailed schema definitions are documented in [docs/api.md](docs/api.md).
 
-Containers in the same Docker network can use `torproxy:8118` as their proxy. They can also reach the control API at `torproxy:8080`, so only connect containers you trust to that network.
+---
 
-```sh
-curl -v -x http://torproxy:8118 https://check.torproject.org/api/ip
-```
+## Container Health Checks
 
-## Automate privacy-aware workflows
+`torproxy` includes a ready-aware Docker health check (`docker/healthcheck.sh`). A container reports `healthy` only when:
+1. Privoxy and Tor daemons are running under non-root user.
+2. Tor bootstrap is 100% complete (`bootstrapped=done`).
+3. SOCKS5 listener on port 9050 passes greeting handshake.
+4. Egress IP is confirmed through Tor (`IsTor: true`).
 
-The REST API exists so applications do not need to speak the Tor Control Protocol or manage Tor processes themselves. A workflow can ask whether the proxy is ready, pause Tor traffic when it should not run, resume it when work starts, or request a fresh Tor circuit between independent jobs.
-
-This is useful for authorised web-data collection, scheduled integrations, and automation where the application should use a Tor exit IP instead of exposing the network's normal public IP. Always respect the target site's terms, robots guidance, rate limits, and applicable law.
-
-For example, an n8n workflow can use ordinary **HTTP Request** nodes to call the local API:
-
-1. `GET http://torproxy:8080/status` — continue only when the status is `connected`.
-2. Run the task through the HTTP proxy at `http://torproxy:8118`.
-3. `POST http://torproxy:8080/reconnect` — optionally request a new circuit before a separate, authorised job.
-
-The same pattern works in shell scripts, CI/CD pipelines, health monitoring, and any service that can make HTTP requests. A reconnect is a request to Tor, not a guarantee of a different IP address.
-
-## Is it ready?
-
-The image reports `healthy` only after Tor is connected and the proxy can be used. Starting the container is quick, but establishing a Tor connection can take a little longer. The health check `start-period` is 180 seconds so a slow Tor bootstrap is not treated as a failed container.
-
-That distinction lets dependent services wait for a usable proxy instead of merely a running container:
+In Docker Compose, dependent services can wait for genuine Tor readiness using `service_healthy`:
 
 ```yaml
 services:
   app:
+    image: my-scraper:latest
     depends_on:
       torproxy:
         condition: service_healthy
 ```
 
-With Compose, inspect the health state with:
+---
 
-```sh
-docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q torproxy)"
-```
+## Configuration
 
-For the direct `docker run` example, use:
+Default settings require no configuration. You can customize listening ports and bindings via environment variables in a `.env` file or Compose `environment` section:
 
-```sh
-docker inspect --format '{{.State.Health.Status}}' torproxy
-```
+| Variable | Default | Allowed Values | Description |
+| -------- | ------- | -------------- | ----------- |
+| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Valid IPv4 | Bind address for Privoxy inside the container. |
+| `TORPROXY_LISTEN_PORT` | `8118` | `1024`–`65535` | HTTP proxy listening port inside the container. |
+| `TORPROXY_HOST_PORT` | `8118` | `1`–`65535` | Host port mapped to HTTP proxy in `docker-compose.yml`. |
+| `TORPROXY_API_PORT` | `8080` | `1024`–`65535` | REST API listening port (host and container). |
+| `TORPROXY_SOCKS_PORT` | `9050` | `1024`–`65535` | Tor SOCKS5 proxy port (host and container). |
 
-## REST API for Tor status and connection control
+All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
 
-The container includes a small JSON REST API for automation and monitoring. With Compose, it is available on this computer at `http://127.0.0.1:8080`. Containers in the same Docker network can access it too. It has no password, so do not make it publicly available.
+---
 
-| Method | Endpoint                                         | Short description | Example response |
-| --- |--------------------------------------------------| --- | --- |
-| `GET` or `POST` | [`/status`](http://localhost:8080/status)        | Shows the connection state and current Tor IP. | `{"status":"connected","ip":"109.70.100.9"}` |
-| `GET` | [`/ip`](http://localhost:8080/ip)                | Shows the current Tor IP. Returns `503` until an IP is available. | `{"ip":"109.70.100.9"}` |
-| `GET` or `POST` | [`/connect`](http://localhost:8080/connect)      | Establishes or resumes the Tor connection. | `{"action":"connect","status":"success"}` |
-| `GET` or `POST` | [`/disconnect`](http://localhost:8080/disconnect) | Disconnects from Tor and blocks proxy traffic. | `{"action":"disconnect","status":"success"}` |
-| `GET` or `POST` | [`/reconnect`](http://localhost:8080/reconnect)  | Creates a new Tor connection and requests a new IP. | `{"action":"reconnect","status":"success"}` |
+## Shipped Examples
 
-For `/status`, `connected` means the proxy is ready, `connecting` means Tor is still starting, and `disconnected` means it was stopped with `/disconnect`. The `ip` value is `null` until Tor is ready or while it is disconnected.
+Ready-to-run use cases with hardened configurations:
 
-`/reconnect` asks Tor for a new connection and exit IP. Tor may rate-limit this request, so a different IP cannot be guaranteed every time.
+| Example | Purpose | Guide |
+| ------- | ------- | ----- |
+| **Browserless Chromium** | Headless browser automation and scraping routed through Tor. | [View Example](examples/browserless-chromium-via-tor/) |
+| **CRW Web Scraper** | High-performance webpage-to-Markdown scraper via Tor proxy. | [View Example](examples/crw-web-scraper-via-tor/) |
+| **SearXNG Metasearch** | Private, self-hosted search engine routing upstream queries via Tor. | [View Example](examples/searxng-via-tor/) |
 
-Examples:
+---
 
-```sh
-curl http://127.0.0.1:8080/status
-curl -X POST http://127.0.0.1:8080/reconnect
-curl -X POST http://127.0.0.1:8080/disconnect
-```
+## Security Model and Trust Boundaries
 
-The IP result is cached for up to 30 seconds. `/disconnect` and `/reconnect` clear that cache.
+- **Non-Root Execution**: Container processes run strictly under UID `999` (`toruser`).
+- **Authenticated ControlPort**: Tor's control port (`127.0.0.1:9051`) requires ephemeral filesystem cookie authentication (`CookieAuthentication 1`).
+- **Fail-Closed Guarantee**: If Tor disconnects or crashes, Privoxy drops traffic and returns HTTP 503 instead of leaking to clearnet.
+- **DNS Leak Prevention**: To prevent local DNS leaks, always use remote DNS resolution with SOCKS5 (`curl --socks5-hostname 127.0.0.1:9050` or `socks5h://`).
+- **Threat Model**: See [SECURITY.md](SECURITY.md) for vulnerability reporting procedures, threat boundaries, and anonymity limitations.
 
-## Settings
+---
 
-The default settings work without any extra file. To change a port, create a `.env` file in the project folder, for example:
+## Project Documentation
 
-```dotenv
-TORPROXY_HOST_PORT=8118
-TORPROXY_LISTEN_ADDRESS=0.0.0.0
-TORPROXY_LISTEN_PORT=8118
-TORPROXY_API_PORT=8080
-TORPROXY_SOCKS_PORT=9050
-```
+- [docs/compatibility.md](docs/compatibility.md) — Absolute backward compatibility contract and frozen interfaces.
+- [docs/api.md](docs/api.md) — Exhaustive REST API specification and response schemas.
+- [docs/configuration.md](docs/configuration.md) — Configuration guide and startup validation rules.
+- [docs/quality-baseline.md](docs/quality-baseline.md) — Measurable quality and performance baselines.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `TORPROXY_HOST_PORT` | `8118` | Port on your computer for the proxy. |
-| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Address the proxy uses inside its container. Usually leave this unchanged. |
-| `TORPROXY_LISTEN_PORT` | `8118` | Proxy port inside the container. Usually leave this unchanged. |
-| `TORPROXY_API_PORT` | `8080` | Port for the status and control API. |
-| `TORPROXY_SOCKS_PORT` | `9050` | Port on your computer and inside the container for Tor's SOCKS5 proxy. |
+---
 
-The settings are checked when the container starts. The SOCKS5 port is published only on `127.0.0.1`, so it is not accessible from outside the host. Other containers on the same Docker network can also reach it at `torproxy:9050`.
+## Contributing
 
-## Safety
+We welcome contributions! Please review our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CONTRIBUTING.md#core-engineering-principles).
+All PRs must maintain backward compatibility, include hermetic unit tests, and maintain >= 90% test coverage.
 
-This project is deliberately small: it has no user accounts, password protection, or saved state. Its local API can connect, disconnect, and renew the Tor connection.
-
-Do not expose ports `8118`, `9050`, or `8080` to the internet. Anyone who can reach either proxy can use it, and anyone who can reach the API can control its connection.
-
-Both proxy endpoints send traffic through Tor. Although the SOCKS5 listener binds to the container network so Docker can forward it, Compose publishes it only on the host loopback interface.
+---
 
 ## License
 
 Released under the [MIT License](LICENSE).
+
+---
 
 ## 💝 Support the Project
 

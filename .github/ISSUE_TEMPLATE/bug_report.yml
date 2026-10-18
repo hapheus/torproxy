@@ -1,0 +1,49 @@
+name: Bug Report
+description: Create a report to help us reproduce and fix an issue
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please ensure you are not reporting a security vulnerability here.
+        For vulnerabilities or IP leak concerns, please see [SECURITY.md](https://github.com/hapheus/torproxy/blob/main/SECURITY.md).
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide reproduction steps, minimal compose file, or curl command.
+      placeholder: |
+        1. docker compose up -d
+        2. curl http://127.0.0.1:8080/status
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Container Logs
+      description: Output from `docker compose logs` or container output.
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Info
+      description: Docker version, OS, container image tag.
+      placeholder: |
+        - Docker version: 27.x
+        - Host OS: Ubuntu 24.04 / macOS
+        - torproxy image tag: latest
