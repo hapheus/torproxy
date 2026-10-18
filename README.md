@@ -148,6 +148,7 @@ Ready-to-run use cases with hardened configurations:
 - [docs/hardening.md](docs/hardening.md) — Container runtime hardening, read-only rootfs, and dropped capabilities.
 - [docs/releases.md](docs/releases.md) — Semantic versioning policy, upgrade paths, and instant rollback procedures.
 - [docs/quality-baseline.md](docs/quality-baseline.md) — Measurable quality and performance baselines.
+- [docs/quality-gate-10-10.md](docs/quality-gate-10-10.md) — Final 10/10 quality gate audit and verification matrix.
 
 ---
 
