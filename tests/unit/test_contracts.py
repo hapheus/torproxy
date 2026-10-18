@@ -275,6 +275,8 @@ class TestEnvironmentAndDefaultsContract:
         assert "TORPROXY_LISTEN_PORT=8118" in env_example
         assert "TORPROXY_API_PORT=8080" in env_example
         assert "TORPROXY_SOCKS_PORT=9050" in env_example
+        assert "TORPROXY_COUNTRY" in env_example
+        assert "TORPROXY_STRICT_NODES" in env_example
 
     def test_docker_compose_loopback_bindings(self):
         compose_path = os.path.join(REPO_ROOT, "docker-compose.yml")

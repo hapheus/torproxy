@@ -312,6 +312,174 @@ class TestAPIEndpoints:
             assert api._cached_ip is None
             mock_tor.assert_called_with("SIGNAL NEWNYM")
 
+    def test_reconnect_with_country_query_param(self, api_server):
+        api.reset_country_state()
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = ("250 OK", None)
+            req = urllib.request.Request(f"{api_server}/reconnect?country=DE", method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                data = json.loads(resp.read().decode("utf-8"))
+                assert data["action"] == "reconnect"
+                assert data["status"] == "success"
+                assert data["exit_country"] == "DE"
+            mock_tor.assert_any_call("SETCONF ExitNodes={de}")
+            mock_tor.assert_any_call("SIGNAL NEWNYM")
+            assert api.get_current_country() == "DE"
+
+    def test_connect_with_country_and_strict_json_body(self, api_server):
+        api.reset_country_state()
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = ("250 OK", None)
+            payload = json.dumps({"country": "AT,CH", "strict_nodes": True}).encode("utf-8")
+            req = urllib.request.Request(
+                f"{api_server}/connect",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                data = json.loads(resp.read().decode("utf-8"))
+                assert data["action"] == "connect"
+                assert data["status"] == "success"
+                assert data["exit_country"] == "AT,CH"
+                assert data["strict_nodes"] is True
+            mock_tor.assert_any_call("SETCONF ExitNodes={at},{ch}")
+            mock_tor.assert_any_call("SETCONF StrictNodes=1")
+            mock_tor.assert_any_call("SETCONF DisableNetwork=0")
+            assert api.get_current_country() == "AT,CH"
+            assert api.get_current_strict_nodes() is True
+
+    def test_reconnect_clear_country(self, api_server):
+        api.set_current_country_state("DE", True)
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = ("250 OK", None)
+            req = urllib.request.Request(f"{api_server}/reconnect?country=any", method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                data = json.loads(resp.read().decode("utf-8"))
+                assert data["action"] == "reconnect"
+                assert data["status"] == "success"
+                assert data.get("exit_country") is None
+            mock_tor.assert_any_call("SETCONF ExitNodes=")
+            mock_tor.assert_any_call("SIGNAL NEWNYM")
+            assert api.get_current_country() is None
+
+    def test_reconnect_invalid_country_returns_400(self, api_server):
+        req = urllib.request.Request(f"{api_server}/reconnect?country=INVALID", method="POST")
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 400
+        data = json.loads(exc_info.value.read().decode("utf-8"))
+        assert "Invalid ISO country code" in data["error"]
+
+    def test_reconnect_invalid_json_body_returns_400(self, api_server):
+        req = urllib.request.Request(
+            f"{api_server}/reconnect",
+            data=b"invalid-json{",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 400
+        data = json.loads(exc_info.value.read().decode("utf-8"))
+        assert "Malformed JSON request body" in data["error"]
+
+    def test_reconnect_tor_error_setting_exit_nodes(self, api_server):
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = (None, "Tor syntax error in ExitNodes")
+            req = urllib.request.Request(f"{api_server}/reconnect?country=DE", method="POST")
+            with pytest.raises(urllib.error.HTTPError) as exc_info:
+                urllib.request.urlopen(req)
+            assert exc_info.value.code == 500
+            data = json.loads(exc_info.value.read().decode("utf-8"))
+            assert "Failed to configure ExitNodes in Tor" in data["error"]
+
+    def test_reconnect_tor_error_setting_strict_nodes(self, api_server):
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.side_effect = [
+                ("250 OK", None),  # SETCONF ExitNodes
+                (None, "Tor error setting strict nodes"),  # SETCONF StrictNodes
+            ]
+            req = urllib.request.Request(
+                f"{api_server}/reconnect?country=DE&strict_nodes=1", method="POST"
+            )
+            with pytest.raises(urllib.error.HTTPError) as exc_info:
+                urllib.request.urlopen(req)
+            assert exc_info.value.code == 500
+            data = json.loads(exc_info.value.read().decode("utf-8"))
+            assert "Failed to configure StrictNodes in Tor" in data["error"]
+
+    def test_reconnect_invalid_strict_nodes_returns_400(self, api_server):
+        req = urllib.request.Request(f"{api_server}/reconnect?strict_nodes=maybe", method="POST")
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 400
+        data = json.loads(exc_info.value.read().decode("utf-8"))
+        assert "Invalid boolean value for strict_nodes" in data["error"]
+
+    def test_legacy_get_reconnect_with_country(self, api_server):
+        api.reset_country_state()
+        with patch("api.send_tor_command") as mock_tor:
+            mock_tor.return_value = ("250 OK", None)
+            req = urllib.request.Request(f"{api_server}/reconnect?country=IT", method="GET")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                data = json.loads(resp.read().decode("utf-8"))
+                assert data["action"] == "reconnect"
+                assert data["exit_country"] == "IT"
+            mock_tor.assert_any_call("SETCONF ExitNodes={it}")
+            assert api.get_current_country() == "IT"
+
+    def test_reconnect_dynamic_switch_reflected_in_diagnostics(self, api_server):
+        api.reset_country_state()
+        with (
+            patch("api.send_tor_command") as mock_tor,
+            patch("api.get_tor_bootstrap_status") as mock_boot,
+            patch("api.check_socks5_ready") as mock_socks,
+            patch("api.get_current_ip") as mock_ip,
+        ):
+            mock_tor.return_value = ("250 OK", None)
+            mock_boot.return_value = ({"bootstrapped": True, "progress": 100}, None)
+            mock_socks.return_value = True
+            mock_ip.return_value = ("185.220.101.5", None)
+
+            # Reconnect with country=ES
+            req = urllib.request.Request(f"{api_server}/reconnect?country=ES", method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+
+            # Query diagnostics
+            mock_tor.return_value = ("250 DisableNetwork=0", None)
+            req_d = urllib.request.Request(f"{api_server}/diagnostics", method="GET")
+            with urllib.request.urlopen(req_d) as resp_d:
+                data_d = json.loads(resp_d.read().decode("utf-8"))
+                assert data_d["tor"]["exit_country"] == "ES"
+
+    def test_validation_helpers_direct(self):
+        # Country validation
+        assert api.validate_country_input(None) == (None, None, None)
+        assert api.validate_country_input("") == ("", None, None)
+        assert api.validate_country_input("any") == ("", None, None)
+        assert api.validate_country_input("DE") == ("{de}", "DE", None)
+        assert api.validate_country_input(["DE", "AT"]) == ("{de},{at}", "DE,AT", None)
+        assert api.validate_country_input(123)[2] is not None
+        assert api.validate_country_input(["DE", "INVALID"])[2] is not None
+
+        # Strict nodes validation
+        assert api.validate_strict_nodes_input(None) == (None, None)
+        assert api.validate_strict_nodes_input(True) == (True, None)
+        assert api.validate_strict_nodes_input(False) == (False, None)
+        assert api.validate_strict_nodes_input(1) == (True, None)
+        assert api.validate_strict_nodes_input(0) == (False, None)
+        assert api.validate_strict_nodes_input("true") == (True, None)
+        assert api.validate_strict_nodes_input("no") == (False, None)
+        assert api.validate_strict_nodes_input(2)[1] is not None
+        assert api.validate_strict_nodes_input("invalid")[1] is not None
+        assert api.validate_strict_nodes_input({})[1] is not None
+
     def test_not_found_endpoint(self, api_server):
         with pytest.raises(urllib.error.HTTPError) as exc_info:
             urllib.request.urlopen(f"{api_server}/invalid-path")

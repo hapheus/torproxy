@@ -9,8 +9,10 @@ import pytest
 @pytest.fixture(autouse=True)
 def reset_metrics():
     api.reset_metrics()
+    api.reset_country_state()
     yield
     api.reset_metrics()
+    api.reset_country_state()
 
 
 @pytest.mark.unit
@@ -47,6 +49,8 @@ class TestDiagnosticsEndpoint:
                     assert data["tor"]["network_enabled"] is True
                     assert data["tor"]["bootstrapped"] is True
                     assert data["tor"]["progress"] == 100
+                    assert "exit_country" in data["tor"]
+                    assert "strict_nodes" in data["tor"]
 
                     assert "proxies" in data
                     assert data["proxies"]["socks5_ready"] is True
@@ -140,6 +144,41 @@ class TestMetricsEndpoint:
                     assert "torproxy_tor_bootstrapped 1" in body
                     assert "torproxy_tor_bootstrap_progress 100" in body
                     assert "torproxy_socks5_ready 1" in body
+                    assert "torproxy_strict_nodes 0" in body
+                    assert 'torproxy_exit_country_info{country=""} 1' in body
+
+    def test_country_configuration_observability(self, api_server, monkeypatch):
+        monkeypatch.setenv("TORPROXY_COUNTRY", "DE")
+        monkeypatch.setenv("TORPROXY_STRICT_NODES", "1")
+
+        with (
+            patch("api.send_tor_command") as mock_tor,
+            patch("api.get_tor_bootstrap_status") as mock_boot,
+            patch("api.check_socks5_ready") as mock_socks,
+            patch("api.get_current_ip") as mock_ip,
+        ):
+            mock_tor.return_value = ("250 DisableNetwork=0", None)
+            mock_boot.return_value = (
+                {"bootstrapped": True, "progress": 100, "summary": "Done"},
+                None,
+            )
+            mock_socks.return_value = True
+            mock_ip.return_value = ("185.220.101.5", None)
+
+            # Test diagnostics
+            req = urllib.request.Request(f"{api_server}/diagnostics", method="GET")
+            with urllib.request.urlopen(req) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                assert data["tor"]["exit_country"] == "DE"
+                assert data["tor"]["strict_nodes"] is True
+
+            # Test metrics
+            req_m = urllib.request.Request(f"{api_server}/metrics", method="GET")
+            with urllib.request.urlopen(req_m) as resp_m:
+                body = resp_m.read().decode("utf-8")
+                assert 'torproxy_exit_country_info{country="DE"} 1' in body
+                assert "torproxy_strict_nodes 1" in body
+
 
 
 @pytest.mark.unit

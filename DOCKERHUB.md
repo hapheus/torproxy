@@ -19,6 +19,7 @@ Source repository: [https://github.com/hapheus/torproxy](https://github.com/haph
 - **Authenticated Tor Control**: Local Tor ControlPort is secured using ephemeral 32-byte filesystem cookie authentication.
 - **Non-Root Execution**: Runs under a dedicated, unprivileged system user (`torproxy`), never as root.
 - **Multi-Architecture**: Built natively for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
+- **Country-Specific Exit Nodes**: Route traffic through exit relays in specific countries (e.g. `TORPROXY_COUNTRY=DE` or `DE,AT`) backed by `tor-geoipdb`.
 - **Zero Breaking Changes**: Guaranteed backward compatibility across minor releases.
 
 ---
@@ -51,6 +52,19 @@ services:
       - "127.0.0.1:8080:8080"
 ```
 
+### Option 3: Country-Specific Exit Proxy (e.g. Germany or Austria)
+
+```bash
+docker run -d \
+  --name torproxy \
+  --restart unless-stopped \
+  -e TORPROXY_COUNTRY=DE \
+  -p 127.0.0.1:8118:8118 \
+  -p 127.0.0.1:9050:9050 \
+  -p 127.0.0.1:8080:8080 \
+  hapheus/torproxy:latest
+```
+
 ---
 
 ## Verifying Tor Connectivity
@@ -69,6 +83,9 @@ curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
 
 # 4. Request a new Tor identity / circuit
 curl -X POST http://127.0.0.1:8080/reconnect
+
+# 5. Dynamically switch exit country without restart
+curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
 ```
 
 ---
@@ -84,9 +101,9 @@ The management API listens on port `8080` (HTTP):
 | `/health` | `GET` | Multi-subsystem health check (`tor`, `proxies`, `egress`). Returns HTTP 200 when healthy, 503 during bootstrap/errors. |
 | `/diagnostics` | `GET` | Uptime, reconnect counters, bootstrap details, and cache status. |
 | `/metrics` | `GET` | Prometheus exposition format metrics. |
-| `/reconnect` | `POST` (or `GET`) | Triggers `SIGNAL NEWNYM` to establish a new Tor circuit. |
+| `/reconnect` | `POST` (or `GET`) | Triggers `SIGNAL NEWNYM` to establish a new circuit. Supports `?country=DE` query or JSON body. |
 | `/disconnect` | `POST` (or `GET`) | Disables Tor network traffic (`SETCONF DisableNetwork=1`). |
-| `/connect` | `POST` (or `GET`) | Re-enables Tor network traffic (`SETCONF DisableNetwork=0`). |
+| `/connect` | `POST` (or `GET`) | Re-enables Tor network traffic (`SETCONF DisableNetwork=0`). Supports `?country=DE` query or JSON body. |
 
 > [!WARNING]
 > The management API is unauthenticated by default. Bind it strictly to `127.0.0.1` or place it behind an authenticating reverse proxy if exposed across networks.
@@ -101,6 +118,8 @@ The management API listens on port `8080` (HTTP):
 | `TORPROXY_LISTEN_PORT` | `8118` | Privoxy HTTP proxy port. |
 | `TORPROXY_SOCKS_PORT` | `9050` | Tor SOCKS5 proxy port. |
 | `TORPROXY_API_PORT` | `8080` | REST API port. |
+| `TORPROXY_COUNTRY` | *(unset)* | Comma-separated ISO 3166-1 alpha-2 codes (e.g. `DE`, `AT`, `US`, `DE,AT`) to restrict exit nodes. |
+| `TORPROXY_STRICT_NODES` | `0` | If `1`/`true`, refuse circuits if nodes in the requested country/countries are unavailable. |
 
 ---
 

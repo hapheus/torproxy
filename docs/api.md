@@ -76,11 +76,25 @@ Returns the current public Tor egress IP address, or `503 Service Unavailable` i
 ### GET | POST `/connect`
 Enables the Tor network connection (`SETCONF DisableNetwork=0`).
 
+#### Parameters (Optional)
+Parameters can be passed via query string (e.g. `?country=DE`) or JSON body for POST:
+- `country` (`string` or `array[string]`): Comma-separated or array of 2-letter ISO 3166-1 alpha-2 country codes (e.g. `"DE"`, `"DE,AT"`, `["DE", "AT"]`). Pass `""` or `"any"` to remove country restriction.
+- `strict_nodes` (`boolean` or `integer`): `1`/`true` or `0`/`false`. If true, circuits are refused if no exit nodes in the requested country are available.
+
 #### Response (Success - 200 OK)
 ```json
 {
   "action": "connect",
-  "status": "success"
+  "status": "success",
+  "exit_country": "DE",
+  "strict_nodes": true
+}
+```
+
+#### Response (Error - 400 Bad Request)
+```json
+{
+  "error": "Invalid ISO country code: 'XYZ'. Must be 2-letter alpha code."
 }
 ```
 
@@ -114,13 +128,27 @@ Disables the Tor network connection (`SETCONF DisableNetwork=1`) and clears the 
 ---
 
 ### GET | POST `/reconnect`
-Requests a new Tor circuit (`SIGNAL NEWNYM`) and invalidates the cached egress IP. Note that while Tor creates a new circuit, exit IP rotation is subject to Tor circuit availability and rate limits.
+Requests a new Tor circuit (`SIGNAL NEWNYM`) and invalidates the cached egress IP.
+
+#### Parameters (Optional)
+Parameters can be passed via query string (e.g. `?country=DE`) or JSON body for POST:
+- `country` (`string` or `array[string]`): Comma-separated or array of 2-letter ISO 3166-1 alpha-2 country codes (e.g. `"DE"`, `"DE,AT"`, `["DE", "AT"]`). Pass `""` or `"any"` to remove country restriction.
+- `strict_nodes` (`boolean` or `integer`): `1`/`true` or `0`/`false`.
 
 #### Response (Success - 200 OK)
 ```json
 {
   "action": "reconnect",
-  "status": "success"
+  "status": "success",
+  "exit_country": "DE",
+  "strict_nodes": true
+}
+```
+
+#### Response (Error - 400 Bad Request)
+```json
+{
+  "error": "Invalid ISO country code: 'XYZ'. Must be 2-letter alpha code."
 }
 ```
 
@@ -144,7 +172,9 @@ Additive diagnostic endpoint providing detailed readiness and component states w
     "network_enabled": true,
     "bootstrapped": true,
     "progress": 100,
-    "summary": "Done"
+    "summary": "Done",
+    "exit_country": "DE",
+    "strict_nodes": true
   },
   "proxies": {
     "socks5": true
@@ -173,7 +203,9 @@ Returns structured runtime diagnostics, process uptime, Tor circuit rebuild stat
     "network_enabled": true,
     "bootstrapped": true,
     "progress": 100,
-    "summary": "Done"
+    "summary": "Done",
+    "exit_country": "DE",
+    "strict_nodes": true
   },
   "proxies": {
     "socks5_ready": true,

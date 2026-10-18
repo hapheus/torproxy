@@ -54,7 +54,6 @@ jobs:
 
       - name: Update Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
-        if: github.ref == 'refs/heads/main'
         with:
           username: hapheus
           password: ${{ secrets.DOCKERHUB_TOKEN }}

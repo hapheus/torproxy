@@ -2,6 +2,7 @@
 
 [![PR Quality & Smoke Gate](https://github.com/hapheus/torproxy/actions/workflows/pr-gate.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/pr-gate.yml)
 [![Daily Live Image Verification](https://github.com/hapheus/torproxy/actions/workflows/daily-image-verification.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/daily-image-verification.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/hapheus/torproxy)](https://hub.docker.com/r/hapheus/torproxy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A minimal, secure, and reliable Tor HTTP and SOCKS5 proxy packaged for Docker. `torproxy` routes traffic through the Tor network with fail-closed protection, non-root execution, an authenticated Tor control interface, and a lightweight JSON REST API for circuit rotation and health monitoring.
@@ -43,6 +44,18 @@ curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
 
 # 4. Check status via the local REST API
 curl http://127.0.0.1:8080/status
+
+# 5. Optional: Route exit traffic through a specific country (e.g. DE or AT)
+TORPROXY_COUNTRY=DE docker compose up -d
+# or multiple countries:
+TORPROXY_COUNTRY=DE,AT docker compose up -d
+
+# 6. Dynamically switch exit country on reconnect without container restart:
+curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
+# or with JSON payload:
+curl -X POST http://127.0.0.1:8080/reconnect \
+  -H "Content-Type: application/json" \
+  -d '{"country": "AT", "strict_nodes": true}'
 ```
 
 > **Security Note:** In `docker-compose.yml`, all ports bind strictly to `127.0.0.1` by default. Neither the proxy listeners nor the management API require authentication; do not expose them to untrusted networks.
@@ -70,9 +83,9 @@ The lightweight API server on port `8080` manages circuits and monitors health w
 | `/health`, `/v1/health` | `GET` | `200`, `503` | Structured diagnostic health state across Tor, proxies, and egress. | `{"status":"healthy","tor":{"bootstrapped":true,"progress":100},"proxies":{"socks5":true},"egress":{"verified":true,"ip":"..."}}` |
 | `/diagnostics`, `/v1/diagnostics` | `GET` | `200` | Operational telemetry (uptime, reconnect counts, bootstrap progress). | `{"uptime_seconds":120,"reconnect_total":2,"tor":{"bootstrapped":true}}` |
 | `/metrics`, `/v1/metrics` | `GET` | `200` | Prometheus exposition format metrics for scrapers. | Plaintext Prometheus metrics. |
-| `/reconnect` | `POST` (or `GET`) | `200` | Request a new Tor circuit (`SIGNAL NEWNYM`). Clears IP cache. | `{"action":"reconnect","status":"success"}` |
+| `/reconnect` | `POST` (or `GET`) | `200`, `400` | Request new circuit (`SIGNAL NEWNYM`). Supports `?country=DE` or JSON body. Clears IP cache. | `{"action":"reconnect","status":"success","exit_country":"DE"}` |
 | `/disconnect` | `POST` (or `GET`) | `200` | Pause Tor network traffic (`DisableNetwork=1`). Fails closed. | `{"action":"disconnect","status":"success"}` |
-| `/connect` | `POST` (or `GET`) | `200` | Resume Tor network traffic (`DisableNetwork=0`). | `{"action":"connect","status":"success"}` |
+| `/connect` | `POST` (or `GET`) | `200`, `400` | Resume Tor network traffic (`DisableNetwork=0`). Supports `?country=DE` or JSON body. | `{"action":"connect","status":"success"}` |
 
 > **HTTP Methods:** `POST` is recommended for state mutations (`/reconnect`, `/disconnect`, `/connect`). Legacy `GET` calls remain fully supported for backward compatibility.
 > Detailed schema definitions are documented in [docs/api.md](docs/api.md).
@@ -111,6 +124,8 @@ Default settings require no configuration. You can customize listening ports and
 | `TORPROXY_HOST_PORT` | `8118` | `1`–`65535` | Host port mapped to HTTP proxy in `docker-compose.yml`. |
 | `TORPROXY_API_PORT` | `8080` | `1024`–`65535` | REST API listening port (host and container). |
 | `TORPROXY_SOCKS_PORT` | `9050` | `1024`–`65535` | Tor SOCKS5 proxy port (host and container). |
+| `TORPROXY_COUNTRY` | *(unset)* | ISO 3166-1 alpha-2 (e.g. `DE`, `AT`, `US`, `DE,AT`) | Route Tor exit circuits through specific countries using `tor-geoipdb`. |
+| `TORPROXY_STRICT_NODES` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
 
 All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
 
