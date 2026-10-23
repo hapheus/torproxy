@@ -1,11 +1,24 @@
-# torproxy — Minimal, Production-Grade Tor HTTP & SOCKS5 Proxy for Docker
+<div align="center">
+
+# 🧅 torproxy
+
+[![GitHub Release](https://img.shields.io/github/v/release/hapheus/torproxy?style=flat-square&color=blue)](https://github.com/hapheus/torproxy/releases)
+[![Docker Pulls](https://img.shields.io/docker/pulls/hapheus/torproxy?style=flat-square)](https://hub.docker.com/r/hapheus/torproxy)
+[![Docker Image Size](https://img.shields.io/docker/image-size/hapheus/torproxy/latest?style=flat-square)](https://hub.docker.com/r/hapheus/torproxy)
+[![GitHub Stars](https://img.shields.io/github/stars/hapheus/torproxy?style=flat-square)](https://github.com/hapheus/torproxy/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 [![PR Quality & Smoke Gate](https://github.com/hapheus/torproxy/actions/workflows/pr-gate.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/pr-gate.yml)
 [![Daily Live Image Verification](https://github.com/hapheus/torproxy/actions/workflows/daily-image-verification.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/daily-image-verification.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/hapheus/torproxy)](https://hub.docker.com/r/hapheus/torproxy)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![OSV-Scanner](https://github.com/hapheus/torproxy/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/osv-scanner.yml)
+[![CodeQL Analysis](https://github.com/hapheus/torproxy/actions/workflows/codeql.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hapheus/torproxy/badge)](https://scorecard.dev/viewer/?uri=github.com/hapheus/torproxy)
 
-A minimal, secure, and reliable Tor HTTP and SOCKS5 proxy packaged for Docker. `torproxy` routes traffic through the Tor network with fail-closed protection, non-root execution, an authenticated Tor control interface, and a lightweight JSON REST API for circuit rotation and health monitoring.
+[Quick Start](#quick-start) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+A minimal, secure, and reliable Tor HTTP and SOCKS5 proxy packaged for Docker. `torproxy` routes traffic through the Tor network with fail-closed protection, non-root execution, an authenticated Tor control interface, and a lightweight JSON REST API for circuit rotation, health monitoring, and dynamic exit node routing.
 
 ---
 

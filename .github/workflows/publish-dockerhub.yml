@@ -42,7 +42,8 @@ jobs:
       - name: Build and publish image
         uses: docker/build-push-action@v6
         with:
-          context: ./docker
+          context: .
+          file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -60,4 +61,3 @@ jobs:
           repository: hapheus/torproxy
           readme-filepath: ./DOCKERHUB.md
           short-description: "Lightweight, secure Docker HTTP/SOCKS5 Tor proxy with local REST control API"
-

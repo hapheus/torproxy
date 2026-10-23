@@ -1,35 +1,31 @@
-import os
-import sys
 import threading
-from http.server import ThreadingHTTPServer
 
 import pytest
 
-# Ensure docker/ directory is on sys.path for api module import
-docker_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docker"))
-if docker_dir not in sys.path:
-    sys.path.insert(0, docker_dir)
-
-import api  # noqa: E402
+from tests.support import api
+from torproxy.adapters.tor_control import TorControlClient
+from torproxy.configuration import Settings
+from torproxy.state import RuntimeState
+from torproxy.web.router import Router
+from torproxy.web.server import ProxyHTTPServer
 
 
 @pytest.fixture(autouse=True)
-def reset_api_state():
-    api.clear_ip_cache()
-    api.reset_metrics()
-    api.reset_country_state()
+def reset_api_state(tmp_path):
+    cookie = tmp_path / "control_auth_cookie"
+    cookie.write_bytes(b"\x01" * 32)
+    api.settings = Settings(cookie_path=str(cookie))
+    api.control = TorControlClient(9051, str(cookie))
+    api.state = RuntimeState(None, False, api.state.clock)
     yield
-    api.clear_ip_cache()
-    api.reset_metrics()
-    api.reset_country_state()
 
 
 @pytest.fixture(scope="module")
 def api_server():
-    server = ThreadingHTTPServer(("127.0.0.1", 0), api.APIHandler)
-    port = server.server_port
+    server = ProxyHTTPServer(("127.0.0.1", 0), Router(api), Settings())
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    yield f"http://127.0.0.1:{port}"
+    yield f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
     server.server_close()
+    thread.join(timeout=3)

@@ -55,9 +55,8 @@ class TestExamplesIntegrity:
 
         # torproxy in examples must communicate internally via Docker network
         # and MUST NOT publish ports to host
-        assert "ports" not in tor_service or not tor_service["ports"], (
-            f"torproxy service in {example_name} unexpectedly publishes ports to host"
-        )
+        no_ports = "ports" not in tor_service or not tor_service["ports"]
+        assert no_ports, f"torproxy service in {example_name} unexpectedly publishes ports to host"
 
         env = tor_service.get("environment", {})
         if isinstance(env, dict):
@@ -77,9 +76,9 @@ class TestExamplesIntegrity:
         # Must depend on torproxy health
         depends_on = consumer.get("depends_on", {})
         assert "torproxy" in depends_on, f"{consumer_name} must depend on torproxy"
-        assert depends_on["torproxy"].get("condition") == "service_healthy", (
-            f"{consumer_name} must wait for torproxy condition: service_healthy"
-        )
+        cond = depends_on["torproxy"].get("condition")
+        err = f"{consumer_name} must wait for torproxy condition: service_healthy"
+        assert cond == "service_healthy", err
 
         # All published ports must bind strictly to 127.0.0.1
         ports = consumer.get("ports", [])
@@ -103,9 +102,7 @@ class TestExamplesIntegrity:
         assert "--proxy-server=http://torproxy:8118" in launch_arg_entry
 
     def test_crw_proxy_configuration(self):
-        compose_path = os.path.join(
-            EXAMPLES_DIR, "crw-web-scraper-via-tor", "docker-compose.yml"
-        )
+        compose_path = os.path.join(EXAMPLES_DIR, "crw-web-scraper-via-tor", "docker-compose.yml")
         with open(compose_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
@@ -171,4 +168,3 @@ class TestHardenedProductionExample:
         assert "## Quick start" in content
         assert "docker compose down" in content
         assert "curl" in content
-

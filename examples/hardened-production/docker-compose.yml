@@ -7,6 +7,10 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+      - /var/lib/tor:rw,noexec,nosuid,size=64m,mode=0700,uid=999,gid=999
     ports:
       - "127.0.0.1:8118:8118"
       - "127.0.0.1:9050:9050"

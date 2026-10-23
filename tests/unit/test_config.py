@@ -32,7 +32,7 @@ class TestConfigTemplates:
         with open(start_script, "r", encoding="utf-8") as f:
             content = f.read()
 
-        assert '-e "s|__TORPROXY_SOCKS_PORT__|$TORPROXY_SOCKS_PORT|"' in content
+        assert "python3 -m torproxy.runtime.configure" in content
 
 
 @pytest.mark.unit
@@ -67,14 +67,17 @@ class TestStartScriptValidation:
         res = self._run_validate(env)
         assert res.returncode == 0, f"Unexpected validation failure: {res.stderr}"
 
-    @pytest.mark.parametrize("invalid_ip", [
-        "999.999.999.999",
-        "1.2.3",
-        "1.2.3.4.5",
-        "abc",
-        "127.0.0.1a",
-        "",
-    ])
+    @pytest.mark.parametrize(
+        "invalid_ip",
+        [
+            "999.999.999.999",
+            "1.2.3",
+            "1.2.3.4.5",
+            "abc",
+            "127.0.0.1a",
+            "",
+        ],
+    )
     def test_invalid_listen_address(self, invalid_ip):
         env = {
             "TORPROXY_LISTEN_ADDRESS": invalid_ip,
@@ -86,11 +89,14 @@ class TestStartScriptValidation:
         assert res.returncode == 1
         assert "TORPROXY_LISTEN_ADDRESS" in res.stderr
 
-    @pytest.mark.parametrize("port_var", [
-        "TORPROXY_LISTEN_PORT",
-        "TORPROXY_API_PORT",
-        "TORPROXY_SOCKS_PORT",
-    ])
+    @pytest.mark.parametrize(
+        "port_var",
+        [
+            "TORPROXY_LISTEN_PORT",
+            "TORPROXY_API_PORT",
+            "TORPROXY_SOCKS_PORT",
+        ],
+    )
     @pytest.mark.parametrize("invalid_port", ["0", "65536", "-1", "abc", ""])
     def test_invalid_ports(self, port_var, invalid_port):
         env = {
@@ -127,9 +133,8 @@ class TestStartScriptValidation:
             "TORPROXY_COUNTRY": valid_country,
         }
         res = self._run_validate(env)
-        assert res.returncode == 0, (
-            f"Valid country '{valid_country}' unexpectedly failed: {res.stderr}"
-        )
+        err_msg = f"Valid country '{valid_country}' unexpectedly failed: {res.stderr}"
+        assert res.returncode == 0, err_msg
 
     @pytest.mark.parametrize(
         "invalid_country", ["GER", "12", "D", "DE,,AT", "DE;AT", "!#", "DE 12"]
@@ -184,52 +189,13 @@ class TestTorrcGeneration:
         env.update(env_overrides)
         env["TORPROXY_SOCKS_PORT"] = "9050"
         torrc_template = os.path.join(DOCKER_DIR, "torrc")
-        rendered_torrc = str(tmp_path / "torrc")
 
-        # Execute the torrc generation block with /tmp/torrc redirected to tmp_path
-        script = f"""
-            sed -e "s|__TORPROXY_SOCKS_PORT__|$TORPROXY_SOCKS_PORT|" \\
-                "{torrc_template}" > "{rendered_torrc}"
-            exit_nodes=""
-            country_input="${{TORPROXY_COUNTRY:-${{TORPROXY_EXIT_COUNTRY:-}}}}"
-            if [[ -n "$country_input" ]]; then
-              cleaned="${{country_input// /}}"
-              IFS=',' read -r -a ccs <<< "$cleaned"
-              formatted=""
-              for c in "${{ccs[@]}}"; do
-                lower_c=$(echo "$c" | tr '[:upper:]' '[:lower:]')
-                if [[ -z "$formatted" ]]; then
-                  formatted="{{$lower_c}}"
-                else
-                  formatted="${{formatted}},{{$lower_c}}"
-                fi
-              done
-              exit_nodes="$formatted"
-            elif [[ -n "${{TORPROXY_EXIT_NODES:-}}" ]]; then
-              exit_nodes="${{TORPROXY_EXIT_NODES}}"
-            fi
+        # Execute the torrc generation block
+        from pathlib import Path
 
-            if [[ -n "$exit_nodes" ]]; then
-              echo "ExitNodes $exit_nodes" >> "{rendered_torrc}"
-              strict_val="${{TORPROXY_STRICT_NODES:-1}}"
-              if [[ "$strict_val" =~ ^(1|true|yes|TRUE|YES)$ ]]; then
-                echo "StrictNodes 1" >> "{rendered_torrc}"
-              else
-                echo "StrictNodes 0" >> "{rendered_torrc}"
-              fi
-            elif [[ -n "${{TORPROXY_STRICT_NODES:-}}" ]]; then
-              strict_val="${{TORPROXY_STRICT_NODES}}"
-              if [[ "$strict_val" =~ ^(1|true|yes|TRUE|YES)$ ]]; then
-                echo "StrictNodes 1" >> "{rendered_torrc}"
-              else
-                echo "StrictNodes 0" >> "{rendered_torrc}"
-              fi
-            fi
-        """
-        res = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
-        assert res.returncode == 0, f"Script failed: {res.stderr}"
-        with open(rendered_torrc, "r", encoding="utf-8") as f:
-            return f.read()
+        from torproxy.configuration import Settings, render_torrc
+
+        return render_torrc(Settings.from_mapping(env), Path(torrc_template).read_text())
 
     def test_default_renders_no_exit_nodes(self, tmp_path):
         content = self._render_torrc({}, tmp_path)
@@ -257,5 +223,3 @@ class TestTorrcGeneration:
         content = self._render_torrc({"TORPROXY_EXIT_NODES": "{ch},{nl}"}, tmp_path)
         assert "ExitNodes {ch},{nl}" in content
         assert "StrictNodes 1" in content
-
-

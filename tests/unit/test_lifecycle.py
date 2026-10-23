@@ -4,8 +4,9 @@ import os
 import urllib.request
 from unittest.mock import MagicMock, patch
 
-import api
 import pytest
+
+from tests.support import api
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DOCKER_DIR = os.path.join(REPO_ROOT, "docker")
@@ -23,7 +24,7 @@ class TestConcurrencySafeCache:
             mock_resp.read.return_value = b'{"IP": "198.51.100.99", "IsTor": true}'
             return mock_resp
 
-        api.clear_ip_cache()
+        api.state.invalidate()
 
         with patch("urllib.request.build_opener") as mock_builder:
             mock_opener = MagicMock()
@@ -40,27 +41,27 @@ class TestConcurrencySafeCache:
                 assert err is None
 
         # Cache was populated and reused across threads
-        assert api._cached_ip == "198.51.100.99"
+        assert api.state.cached_ip == "198.51.100.99"
 
     def test_cache_cleared_during_reconnect_and_disconnect(self, api_server):
-        api._cached_ip = "192.0.2.55"
-        api._cached_ip_time = 1000
+        api.state.cached_ip = "192.0.2.55"
+        api.state.cached_at = 1000
 
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 OK", None)
 
             # Reconnect clears cache
             req = urllib.request.Request(f"{api_server}/reconnect", method="POST")
             with urllib.request.urlopen(req) as resp:
                 assert resp.status == 200
-            assert api._cached_ip is None
+            assert api.state.cached_ip is None
 
             # Set again and test disconnect
-            api._cached_ip = "192.0.2.66"
+            api.state.cached_ip = "192.0.2.66"
             req = urllib.request.Request(f"{api_server}/disconnect", method="POST")
             with urllib.request.urlopen(req) as resp:
                 assert resp.status == 200
-            assert api._cached_ip is None
+            assert api.state.cached_ip is None
 
 
 @pytest.mark.unit
@@ -71,7 +72,7 @@ class TestSocks5ReadinessProbe:
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.recv.return_value = b"\x05\x00"
 
-        ready = api.check_socks5_ready(port=9050)
+        ready = api.check_socks5_ready()
         assert ready is True
         mock_sock.connect.assert_called_once_with(("127.0.0.1", 9050))
         mock_sock.sendall.assert_called_once_with(b"\x05\x01\x00")
@@ -82,7 +83,7 @@ class TestSocks5ReadinessProbe:
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.recv.return_value = b"\x05\xff"  # No acceptable auth methods
 
-        ready = api.check_socks5_ready(port=9050)
+        ready = api.check_socks5_ready()
         assert ready is False
 
     @patch("socket.socket")
@@ -91,7 +92,7 @@ class TestSocks5ReadinessProbe:
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.connect.side_effect = ConnectionRefusedError("Connection refused")
 
-        ready = api.check_socks5_ready(port=9050)
+        ready = api.check_socks5_ready()
         assert ready is False
 
 
@@ -99,10 +100,10 @@ class TestSocks5ReadinessProbe:
 class TestHealthDiagnosticEndpoint:
     def test_health_endpoint_healthy(self, api_server):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.check_socks5_ready") as mock_socks,
-            patch("api.get_current_ip") as mock_ip,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.check_socks5_ready") as mock_socks,
+            patch("tests.support.api.get_current_ip") as mock_ip,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -124,9 +125,9 @@ class TestHealthDiagnosticEndpoint:
 
     def test_health_endpoint_bootstrapping(self, api_server):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.check_socks5_ready") as mock_socks,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.check_socks5_ready") as mock_socks,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -144,7 +145,7 @@ class TestHealthDiagnosticEndpoint:
                 assert data["proxies"]["socks5"] is False
 
     def test_health_endpoint_control_error(self, api_server):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = (None, "Socket connection failed")
 
             req = urllib.request.Request(f"{api_server}/health", method="GET")
@@ -156,7 +157,7 @@ class TestHealthDiagnosticEndpoint:
             assert "Socket connection failed" in data["error"]
 
     def test_health_endpoint_network_disabled(self, api_server):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 DisableNetwork=1", None)
 
             req = urllib.request.Request(f"{api_server}/health", method="GET")

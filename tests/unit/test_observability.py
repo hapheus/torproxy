@@ -2,27 +2,29 @@ import json
 import urllib.request
 from unittest.mock import patch
 
-import api
 import pytest
+
+from tests.support import api
+from torproxy.web.server import APIHandler
 
 
 @pytest.fixture(autouse=True)
 def reset_metrics():
-    api.reset_metrics()
-    api.reset_country_state()
+    api.state.invalidate()
+    api.state.invalidate()
     yield
-    api.reset_metrics()
-    api.reset_country_state()
+    api.state.invalidate()
+    api.state.invalidate()
 
 
 @pytest.mark.unit
 class TestDiagnosticsEndpoint:
     def test_diagnostics_endpoint_contract(self, api_server):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.check_socks5_ready") as mock_socks,
-            patch("api.get_current_ip") as mock_ip,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.check_socks5_ready") as mock_socks,
+            patch("tests.support.api.get_current_ip") as mock_ip,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -63,10 +65,10 @@ class TestDiagnosticsEndpoint:
 
     def test_diagnostics_no_privacy_leaks(self, api_server):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.check_socks5_ready") as mock_socks,
-            patch("api.get_current_ip") as mock_ip,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.check_socks5_ready") as mock_socks,
+            patch("tests.support.api.get_current_ip") as mock_ip,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -100,7 +102,7 @@ class TestDiagnosticsEndpoint:
                 assert_no_forbidden_keys(data)
 
     def test_reconnect_increments_counter_and_timestamp(self, api_server):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 OK", None)
 
             # Trigger reconnect
@@ -120,9 +122,9 @@ class TestDiagnosticsEndpoint:
 class TestMetricsEndpoint:
     def test_metrics_prometheus_exposition(self, api_server):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.check_socks5_ready") as mock_socks,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.check_socks5_ready") as mock_socks,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -148,14 +150,14 @@ class TestMetricsEndpoint:
                     assert 'torproxy_exit_country_info{country=""} 1' in body
 
     def test_country_configuration_observability(self, api_server, monkeypatch):
-        monkeypatch.setenv("TORPROXY_COUNTRY", "DE")
-        monkeypatch.setenv("TORPROXY_STRICT_NODES", "1")
+        api.state.country = "DE"
+        api.state.strict_nodes = True
 
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.check_socks5_ready") as mock_socks,
-            patch("api.get_current_ip") as mock_ip,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.check_socks5_ready") as mock_socks,
+            patch("tests.support.api.get_current_ip") as mock_ip,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -180,11 +182,10 @@ class TestMetricsEndpoint:
                 assert "torproxy_strict_nodes 1" in body
 
 
-
 @pytest.mark.unit
 class TestOperationalLogging:
     def test_log_message_masks_sensitive_query_strings(self, capsys):
-        handler = api.APIHandler.__new__(api.APIHandler)
+        handler = APIHandler.__new__(APIHandler)
         handler.client_address = ("127.0.0.1", 12345)
         log_format = '"%s" %s %s'
         log_args = ("GET /status?token=secret123&pass=abc HTTP/1.1", "200", "-")

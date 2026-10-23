@@ -2,7 +2,7 @@ FROM debian:bookworm-slim
 
 LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.description="A minimal HTTP proxy routed through Tor" \
-      org.opencontainers.image.version="1.3.0" \
+      org.opencontainers.image.version="1.4.0" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://github.com/hapheus/torproxy" \
       org.opencontainers.image.url="https://github.com/hapheus/torproxy"
@@ -14,11 +14,12 @@ RUN apt-get update \
     && install -d -m 0700 -o torproxy -g torproxy /var/lib/tor \
     && install -d -o torproxy -g torproxy /var/log/privoxy
 
-COPY --chmod=755 start.sh /usr/local/bin/start.sh
-COPY --chmod=755 healthcheck.sh /usr/local/bin/healthcheck.sh
-COPY --chmod=755 api.py tor_control.py /usr/local/bin/
-COPY privoxy.config.template /etc/privoxy/config.template
-COPY torrc /etc/tor/torrc
+COPY src/torproxy /usr/lib/python3/dist-packages/torproxy
+COPY --chmod=755 docker/start.sh /usr/local/bin/start.sh
+COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY --chmod=755 docker/api.py docker/tor_control.py /usr/local/bin/
+COPY docker/privoxy.config.template /etc/privoxy/config.template
+COPY docker/torrc /etc/tor/torrc
 
 USER torproxy
 
