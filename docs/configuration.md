@@ -74,7 +74,7 @@ When the container launches, `/usr/local/bin/start.sh` executes the following se
 
 ## 5. Country-Specific Exit Nodes (GeoIP Routing)
 
-`torproxy` bundles Debian's `tor-geoipdb` package (`/usr/share/tor/geoip` and `/usr/share/tor/geoip6`) allowing exit node country routing.
+`torproxy` bundles the Tor GeoIP database (`/usr/share/tor/geoip` and `/usr/share/tor/geoip6`) allowing exit node country routing.
 
 ### Static Startup Configuration
 Specify `TORPROXY_COUNTRY` with comma-separated ISO 3166-1 alpha-2 codes:
