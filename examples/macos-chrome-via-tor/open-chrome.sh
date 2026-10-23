@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Open Google Chrome in a new isolated Incognito window routed via torproxy
+# Open Google Chrome in an isolated profile routed strictly via torproxy
 # ==============================================================================
 set -euo pipefail
 
 PROXY_HOST="${TORPROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${TORPROXY_PORT:-8118}"
 TARGET_URL="${1:-https://check.torproject.org}"
+PROFILE_DIR="${TORPROXY_PROFILE_DIR:-$(mktemp -d -t torproxy-chrome-XXXXXX)}"
 
 # Verify torproxy is reachable
 if ! curl -s --connect-timeout 2 "http://${PROXY_HOST}:${PROXY_PORT}" >/dev/null 2>&1 && \
@@ -31,12 +32,16 @@ if [ -z "$BROWSER_APP" ]; then
   exit 1
 fi
 
-echo "🚀 Opening $BROWSER_APP in incognito mode routed via http://${PROXY_HOST}:${PROXY_PORT}..."
+echo "🚀 Opening $BROWSER_APP in isolated profile routed via http://${PROXY_HOST}:${PROXY_PORT}..."
 open -na "$BROWSER_APP" --args \
+  --user-data-dir="$PROFILE_DIR" \
   --incognito \
+  --no-first-run \
+  --no-default-browser-check \
   --proxy-server="http://${PROXY_HOST}:${PROXY_PORT}" \
   "$TARGET_URL"
 
-echo "✅ Browser launched. You can verify your Tor exit connection at $TARGET_URL"
+echo "✅ Browser launched with isolated profile ($PROFILE_DIR)"
+echo "🌐 Verifying target: $TARGET_URL"
 echo "💡 To request a new Tor identity, run:"
 echo "   curl -s -X POST http://${PROXY_HOST}:8080/reconnect"

@@ -198,6 +198,7 @@ class TestMacOSChromeExample:
             content = f.read()
         assert "--incognito" in content
         assert "--proxy-server=" in content
+        assert "--user-data-dir=" in content
         assert "open -na" in content
 
     def test_macos_chrome_readme_documentation(self):
