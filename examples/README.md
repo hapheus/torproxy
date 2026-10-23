@@ -7,6 +7,7 @@ This collection shows how Docker applications can route outbound HTTP traffic th
 | Use case | What it demonstrates | Start here |
 | --- | --- | --- |
 | Production Hardening | Minimal privileges, `cap_drop: [ALL]`, `no-new-privileges: true`, read-only volumes, and production health monitoring. | [Production Hardened Tor Proxy](hardened-production/README.md) |
+| macOS Chrome Incognito | Launch Google Chrome or Chromium on macOS in an isolated, anonymous Incognito window routed through Tor with pure terminal commands. | [macOS Chrome Incognito through Tor](macos-chrome-via-tor/README.md) |
 | Browser automation through Tor | Browserless Chromium loads web pages through the Tor HTTP proxy. Useful for authorised browser testing, privacy-conscious automation, and reproducible egress-IP checks. | [Browserless Chromium through Tor](browserless-chromium-via-tor/README.md) |
 | Web scraping and crawling through Tor | Self-hosted CRW scrapes websites through torproxy and returns clean Markdown or JSON for applications and data pipelines. | [CRW web scraper through Tor](crw-web-scraper-via-tor/README.md) |
 | Private metasearch through Tor | SearXNG sends queries to its configured search engines through the Tor HTTP proxy and exposes a local search UI and JSON API. | [SearXNG metasearch through Tor](searxng-via-tor/README.md) |
