@@ -12,6 +12,7 @@ def main() -> None:
         print(f"Starting API server on port {server.server_port}...", flush=True)
         server.serve_forever()
     except KeyboardInterrupt:
+        # Graceful shutdown initiated by user interrupt (Ctrl+C) or termination signal
         pass
     finally:
         server.server_close()

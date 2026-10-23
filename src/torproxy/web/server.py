@@ -85,6 +85,7 @@ class APIHandler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(payload)
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            # Client disconnected before the full response could be delivered
             pass
 
     def do_GET(self) -> None:
