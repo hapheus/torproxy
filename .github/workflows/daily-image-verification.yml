@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # -------------------------------------------------------------
       # 1. Host baseline: determine runner IP to guard against leaks
@@ -44,7 +44,7 @@ jobs:
 
       - name: Log in to Docker Hub (Rate Limit Prevention)
         if: env.DOCKERHUB_TOKEN != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: docker.io
           username: hapheus
@@ -313,7 +313,7 @@ jobs:
       # -------------------------------------------------------------
       - name: Alert on Failure (Create/Update Issue)
         if: failure() && env.canary_inconclusive != 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const issueTitle = '🚨 Daily Live Image Verification Failed';
@@ -350,7 +350,7 @@ jobs:
       # -------------------------------------------------------------
       - name: Auto-Resolve Open Canary Alerts
         if: success()
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { data: issues } = await github.rest.issues.listForRepo({
