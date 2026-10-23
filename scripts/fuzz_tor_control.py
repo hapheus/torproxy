@@ -49,6 +49,7 @@ def TestOneInput(data: bytes) -> None:
     try:
         read_reply(fake_sock)  # type: ignore[arg-type]
     except (TorControlError, UnicodeDecodeError, ValueError):
+        # Expected parsing rejections during fuzzing
         pass
 
     # Fuzz Settings environment mapping parser
@@ -60,6 +61,7 @@ def TestOneInput(data: bytes) -> None:
     try:
         Settings.from_mapping(env_mapping)
     except ValueError:
+        # Expected invalid configuration inputs during fuzzing
         pass
 
 
