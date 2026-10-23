@@ -71,14 +71,14 @@ To protect users against upstream vulnerabilities and supply chain compromises:
 
 1. **Continuous Automated Scanning**:
    - Every pull request and merge to `main` undergoes container vulnerability scanning using Trivy.
-   - Images are evaluated against standard CVE databases (Debian Security Advisories, NVD).
+   - Images are evaluated against standard CVE databases (Alpine SecDB, NVD).
 2. **Triage Severity SLA**:
    - **Critical & High**: Addressed within 7 business days via base image update or upstream package bump.
    - **Medium & Low**: Triaged during regular monthly release cycles.
 3. **False Positive & Exception Process**:
    - Any accepted risk or scanner false-positive must be documented in a `.trivyignore` file with an issue link, rationale, and expiration date.
 4. **Base Image Updates**:
-   - The container builds upon `debian:bookworm-slim`. Security patches for `tor`, `privoxy`, `curl`, and `ca-certificates` are pulled directly from Debian security mirrors during build.
+   - The container builds upon `alpine:3.21`. Security patches for `tor`, `privoxy`, `curl`, and `ca-certificates` are pulled directly from Alpine security mirrors during build.
 
 ---
 

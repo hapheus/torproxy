@@ -40,7 +40,7 @@ Every official image build targets the following architectures using Docker Buil
 ## 3. Supply Chain Security, SBOM, and Provenance
 
 - **Provenance Attestations**: Published container images include SLSA provenance metadata (`mode=max`) embedded in the container manifest.
-- **Software Bill of Materials (SBOM)**: Release builds include an SPDX/CycloneDX SBOM documenting all installed Debian packages and file digests.
+- **Software Bill of Materials (SBOM)**: Release builds include an SPDX/CycloneDX SBOM documenting all installed packages and file digests.
 - **Automated Vulnerability Scanning**: Images are scanned against CVE databases (Trivy) on every PR and build before publishing.
 
 ---
