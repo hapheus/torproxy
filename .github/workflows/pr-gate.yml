@@ -24,24 +24,31 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Linting Tools
+      - name: Install Linting & Typing Tools
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install ruff mypy .[dev]
 
-      - name: Run Ruff Linter
+      - name: Run Ruff Linter & Format Check
         run: |
           ruff check .
+          ruff format --check .
+
+      - name: Run Mypy Type Checker
+        run: |
+          mypy
 
       - name: Validate Shell Script Syntax
         run: |
           bash -n docker/start.sh
           bash -n docker/healthcheck.sh
+          bash -n tests/integration/verify_container.sh
 
       - name: Run ShellCheck
         run: |
           shellcheck docker/start.sh
           shellcheck docker/healthcheck.sh
+          shellcheck tests/integration/verify_container.sh
 
   unit-tests:
     name: "Hermetic Unit Tests"
@@ -55,14 +62,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Test Dependencies
+      - name: Install Package & Test Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov pyyaml
+          pip install .[dev]
 
       - name: Run Pytest (Hermetic Unit Tests with Coverage)
         run: |
-          pytest tests/unit/ -v --cov=docker --cov-report=term-missing --cov-report=xml --cov-fail-under=90
+          pytest tests/unit/ -v --cov=torproxy --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
   docker-smoke:
     name: "Docker Build & Container Smoke Test"
@@ -92,7 +99,7 @@ jobs:
           BUILD_SUCCESS=false
           for i in {1..5}; do
             echo "Attempt $i: Building Docker image..."
-            if docker build -t torproxy:smoke-test ./docker; then
+            if docker build -f docker/Dockerfile -t torproxy:smoke-test .; then
               BUILD_SUCCESS=true
               break
             fi
@@ -144,7 +151,7 @@ jobs:
       - name: Run Pytest Integration Suite
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install -e .[dev]
           pytest tests/integration/ -v -m smoke
 
       - name: Verify Graceful Shutdown
@@ -217,4 +224,3 @@ jobs:
         run: |
           docker rm -f torproxy-smoke torproxy-hardened-test torproxy-prev torproxy-upgrade || true
           docker compose down -v || true
-

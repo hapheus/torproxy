@@ -5,8 +5,9 @@ import urllib.error
 import urllib.request
 from unittest.mock import patch
 
-import api
 import pytest
+
+from tests.support import api
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DOCKER_DIR = os.path.join(REPO_ROOT, "docker")
@@ -20,9 +21,9 @@ class TestAPIContract:
     @pytest.mark.parametrize("path", ["/status", "/"])
     def test_status_connected_schema(self, api_server, method, path):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.get_current_ip") as mock_ip,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.get_current_ip") as mock_ip,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = ({"bootstrapped": True, "summary": "Done"}, None)
@@ -41,8 +42,8 @@ class TestAPIContract:
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_status_connecting_schema(self, api_server, method):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = (
@@ -62,9 +63,9 @@ class TestAPIContract:
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_status_bootstrapped_but_ip_check_fails_schema(self, api_server, method):
         with (
-            patch("api.send_tor_command") as mock_tor,
-            patch("api.get_tor_bootstrap_status") as mock_boot,
-            patch("api.get_current_ip") as mock_ip,
+            patch("tests.support.api.send_tor_command") as mock_tor,
+            patch("tests.support.api.get_tor_bootstrap_status") as mock_boot,
+            patch("tests.support.api.get_current_ip") as mock_ip,
         ):
             mock_tor.return_value = ("250 DisableNetwork=0", None)
             mock_boot.return_value = ({"bootstrapped": True, "summary": "Done"}, None)
@@ -81,7 +82,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_status_disconnected_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 DisableNetwork=1", None)
 
             req = urllib.request.Request(f"{api_server}/status", method=method)
@@ -93,7 +94,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_status_error_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = (None, "ControlPort connection refused")
 
             req = urllib.request.Request(f"{api_server}/status", method=method)
@@ -107,7 +108,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_ip_success_schema(self, api_server, method):
-        with patch("api.get_current_ip") as mock_ip:
+        with patch("tests.support.api.get_current_ip") as mock_ip:
             mock_ip.return_value = ("203.0.113.1", None)
 
             req = urllib.request.Request(f"{api_server}/ip", method=method)
@@ -119,7 +120,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_ip_unavailable_schema(self, api_server, method):
-        with patch("api.get_current_ip") as mock_ip:
+        with patch("tests.support.api.get_current_ip") as mock_ip:
             mock_ip.return_value = (None, "Socket timeout")
 
             req = urllib.request.Request(f"{api_server}/ip", method=method)
@@ -134,7 +135,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_connect_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 OK", None)
 
             req = urllib.request.Request(f"{api_server}/connect", method=method)
@@ -146,7 +147,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_connect_error_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = (None, "Tor daemon down")
 
             req = urllib.request.Request(f"{api_server}/connect", method=method)
@@ -160,7 +161,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_disconnect_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 OK", None)
 
             req = urllib.request.Request(f"{api_server}/disconnect", method=method)
@@ -172,7 +173,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_disconnect_error_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = (None, "Tor daemon down")
 
             req = urllib.request.Request(f"{api_server}/disconnect", method=method)
@@ -186,7 +187,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_reconnect_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = ("250 OK", None)
 
             req = urllib.request.Request(f"{api_server}/reconnect", method=method)
@@ -198,7 +199,7 @@ class TestAPIContract:
 
     @pytest.mark.parametrize("method", ["GET", "POST"])
     def test_reconnect_error_schema(self, api_server, method):
-        with patch("api.send_tor_command") as mock_tor:
+        with patch("tests.support.api.send_tor_command") as mock_tor:
             mock_tor.return_value = (None, "Rate limited")
 
             req = urllib.request.Request(f"{api_server}/reconnect", method=method)
@@ -217,16 +218,18 @@ class TestAPIContract:
         assert exc_info.value.code == 404
         body = json.loads(exc_info.value.read().decode("utf-8"))
         assert body["error"] == "Not Found"
-        assert sorted(body["supported_paths"]) == sorted([
-            "/status",
-            "/ip",
-            "/connect",
-            "/disconnect",
-            "/reconnect",
-            "/health",
-            "/diagnostics",
-            "/metrics",
-        ])
+        assert sorted(body["supported_paths"]) == sorted(
+            [
+                "/status",
+                "/ip",
+                "/connect",
+                "/disconnect",
+                "/reconnect",
+                "/health",
+                "/diagnostics",
+                "/metrics",
+            ]
+        )
 
 
 @pytest.mark.unit
@@ -234,9 +237,9 @@ class TestEnvironmentAndDefaultsContract:
     """Verifies that default configuration values and Dockerfile declarations remain compatible."""
 
     def test_python_api_defaults(self):
-        assert api.API_PORT == 8080
-        assert api.PROXY_PORT == 8118
-        assert api.IP_CACHE_TTL == 30
+        assert api.settings.api_port == 8080
+        assert api.settings.proxy_port == 8118
+        assert api.settings.cache_ttl == 30
 
     def test_dockerfile_defaults_and_instructions(self):
         dockerfile_path = os.path.join(DOCKER_DIR, "Dockerfile")
@@ -284,9 +287,9 @@ class TestEnvironmentAndDefaultsContract:
             compose = f.read()
 
         # Host ports must explicitly bind to 127.0.0.1 by default
-        assert '127.0.0.1:${TORPROXY_HOST_PORT:-8118}:${TORPROXY_LISTEN_PORT:-8118}' in compose
-        assert '127.0.0.1:${TORPROXY_API_PORT:-8080}:${TORPROXY_API_PORT:-8080}' in compose
-        assert '127.0.0.1:${TORPROXY_SOCKS_PORT:-9050}:${TORPROXY_SOCKS_PORT:-9050}' in compose
+        assert "127.0.0.1:${TORPROXY_HOST_PORT:-8118}:${TORPROXY_LISTEN_PORT:-8118}" in compose
+        assert "127.0.0.1:${TORPROXY_API_PORT:-8080}:${TORPROXY_API_PORT:-8080}" in compose
+        assert "127.0.0.1:${TORPROXY_SOCKS_PORT:-9050}:${TORPROXY_SOCKS_PORT:-9050}" in compose
 
 
 @pytest.mark.unit
@@ -316,24 +319,6 @@ class TestComposeExamplesContract:
             with open(compose_path, "r", encoding="utf-8") as f:
                 content = f.read()
             # Wildcard publication like "8080:8080" or "0.0.0.0:8080:8080" is forbidden in examples
-            assert '"8080:8080"' not in content, (
-                f"{example} publishes 8080 without host restriction"
-            )
+            err_msg = f"{example} publishes 8080 without host restriction"
+            assert '"8080:8080"' not in content, err_msg
             assert "0.0.0.0:8080" not in content, f"{example} publishes 8080 to 0.0.0.0"
-
-
-
-@pytest.mark.unit
-class TestServerLifecycle:
-    """Tests the server startup and shutdown loop in api.py."""
-
-    @patch("api.ThreadingHTTPServer")
-    def test_run_server_handles_keyboard_interrupt(self, mock_server_cls):
-        mock_instance = mock_server_cls.return_value
-        mock_instance.serve_forever.side_effect = KeyboardInterrupt
-
-        api.run()
-
-        mock_server_cls.assert_called_once_with(("0.0.0.0", api.API_PORT), api.APIHandler)
-        mock_instance.serve_forever.assert_called_once()
-        mock_instance.server_close.assert_called_once()

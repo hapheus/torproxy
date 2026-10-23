@@ -1,0 +1,14 @@
+**
+!docker/
+!docker/Dockerfile
+!docker/start.sh
+!docker/healthcheck.sh
+!docker/api.py
+!docker/tor_control.py
+!docker/privoxy.config.template
+!docker/torrc
+!src/
+!src/torproxy/
+!src/torproxy/**
+**/__pycache__
+**/*.pyc

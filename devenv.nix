@@ -1,20 +1,20 @@
 { pkgs, ... }:
 
 {
-  # ADR-001: devenv configuration for torproxy
   languages.python = {
     enable = true;
     venv.enable = true;
+    uv.enable = true;
   };
 
   packages = [
     pkgs.git
-    pkgs.ruff
+    pkgs.uv
     pkgs.shellcheck
+    pkgs.actionlint
   ];
 
-  pre-commit.hooks = {
-    ruff.enable = true;
-    shellcheck.enable = true;
-  };
+  enterShell = ''
+    uv sync --active --frozen --extra dev
+  '';
 }

@@ -2,7 +2,8 @@ import socket
 from unittest.mock import MagicMock, patch
 
 import pytest
-import tor_control
+
+from torproxy.adapters import tor_control
 
 
 @pytest.mark.unit
@@ -108,15 +109,15 @@ class TestTorControlAuthentication:
         expected_cmd = f"AUTHENTICATE {expected_hex}\r\n".encode("ascii")
         mock_sock.sendall.assert_called_once_with(expected_cmd)
 
-    def test_authenticate_missing_cookie_fallback(self):
+    def test_authenticate_missing_cookie_fails_closed(self):
         mock_sock = MagicMock()
         mock_sock.recv.side_effect = [b"250 OK\r\n"]
 
         success, err = tor_control.authenticate(mock_sock, cookie_path="/nonexistent/cookie")
 
-        assert success is True
-        assert err is None
-        mock_sock.sendall.assert_called_once_with(b"AUTHENTICATE\r\n")
+        assert success is False
+        assert "cookie unavailable" in err
+        mock_sock.sendall.assert_not_called()
 
     def test_authenticate_cookie_read_oserror(self, tmp_path):
         cookie_file = tmp_path / "unreadable_cookie"
@@ -127,10 +128,9 @@ class TestTorControlAuthentication:
 
         with patch("builtins.open", side_effect=OSError("Permission denied")):
             success, err = tor_control.authenticate(mock_sock, cookie_path=str(cookie_file))
-            assert success is True
-            assert err is None
-            # Fallback to empty AUTHENTICATE
-            mock_sock.sendall.assert_called_once_with(b"AUTHENTICATE\r\n")
+            assert success is False
+            assert "cookie unavailable" in err
+            mock_sock.sendall.assert_not_called()
 
     def test_authenticate_failure_redacts_credentials(self, tmp_path):
         cookie_bytes = b"\x02" * 32
@@ -147,19 +147,23 @@ class TestTorControlAuthentication:
         # Ensure cookie hex is never logged or contained in the error message
         assert cookie_bytes.hex() not in err
 
-    def test_authenticate_socket_exception(self):
+    def test_authenticate_socket_exception(self, tmp_path):
+        cookie = tmp_path / "cookie"
+        cookie.write_bytes(b"x" * 32)
         mock_sock = MagicMock()
         mock_sock.sendall.side_effect = socket.error("Connection reset by peer")
 
-        success, err = tor_control.authenticate(mock_sock, cookie_path="/nonexistent")
+        success, err = tor_control.authenticate(mock_sock, cookie_path=str(cookie))
         assert success is False
         assert "socket error" in err
 
 
 @pytest.mark.unit
 class TestTorControlCommandExecution:
-    @patch("tor_control.socket.socket")
-    def test_execute_command_success(self, mock_socket_class):
+    @patch("torproxy.adapters.tor_control.socket.socket")
+    def test_execute_command_success(self, mock_socket_class, tmp_path):
+        cookie = tmp_path / "cookie"
+        cookie.write_bytes(b"x" * 32)
         mock_sock = MagicMock()
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.recv.side_effect = [
@@ -167,14 +171,16 @@ class TestTorControlCommandExecution:
             b"250 OK\r\n",  # Command reply
         ]
 
-        resp, err = tor_control.send_command("SIGNAL NEWNYM", cookie_path="/nonexistent")
+        resp, err = tor_control.send_command("SIGNAL NEWNYM", cookie_path=str(cookie))
 
         assert err is None
         assert resp == "250 OK\r\n"
         mock_sock.sendall.assert_any_call(b"SIGNAL NEWNYM\r\n")
 
-    @patch("tor_control.socket.socket")
-    def test_execute_command_rejected_by_tor(self, mock_socket_class):
+    @patch("torproxy.adapters.tor_control.socket.socket")
+    def test_execute_command_rejected_by_tor(self, mock_socket_class, tmp_path):
+        cookie = tmp_path / "cookie"
+        cookie.write_bytes(b"x" * 32)
         mock_sock = MagicMock()
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.recv.side_effect = [
@@ -182,30 +188,32 @@ class TestTorControlCommandExecution:
             b"552 Unknown configuration option 'InvalidOption'\r\n",
         ]
 
-        resp, err = tor_control.send_command("SETCONF InvalidOption=1", cookie_path="/nonexistent")
+        resp, err = tor_control.send_command("SETCONF InvalidOption=1", cookie_path=str(cookie))
 
         assert resp is None
         assert "Unknown configuration option" in err
 
-    @patch("tor_control.socket.socket")
+    @patch("torproxy.adapters.tor_control.socket.socket")
     def test_execute_command_socket_timeout(self, mock_socket_class):
         mock_sock = MagicMock()
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.connect.side_effect = socket.timeout("timed out")
 
-        resp, err = tor_control.send_command("GETINFO version", cookie_path="/nonexistent")
+        resp, err = tor_control.send_command("GETINFO version")
 
         assert resp is None
         assert "timed out" in err
 
-    @patch("tor_control.socket.socket")
-    def test_execute_command_auth_failure(self, mock_socket_class):
+    @patch("torproxy.adapters.tor_control.socket.socket")
+    def test_execute_command_auth_failure(self, mock_socket_class, tmp_path):
+        cookie = tmp_path / "cookie"
+        cookie.write_bytes(b"x" * 32)
         mock_sock = MagicMock()
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.recv.side_effect = [
             b"515 Bad authentication\r\n",  # Auth reply fails
         ]
 
-        resp, err = tor_control.send_command("SIGNAL NEWNYM", cookie_path="/nonexistent")
+        resp, err = tor_control.send_command("SIGNAL NEWNYM", cookie_path=str(cookie))
         assert resp is None
         assert "Tor control authentication failed" in err

@@ -53,3 +53,10 @@ Thumbs.db
 # Devenv / Direnv (ADR-001)
 .devenv/
 .direnv/
+
+# AI and Assistant files
+.gemini/
+*.plan
+*AGENTS*
+*GEMINI*
+*CLAUDE*

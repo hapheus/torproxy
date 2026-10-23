@@ -1,0 +1,6 @@
+# Global owners
+* @hapheus @MustermenschAlex
+
+# GitHub Actions workflows & security policies
+/.github/ @hapheus @MustermenschAlex
+/SECURITY.md @hapheus @MustermenschAlex
