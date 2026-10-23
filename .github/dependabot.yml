@@ -14,8 +14,8 @@ updates:
         patterns:
           - "*"
 
-  # Maintain Python dependencies
-  - package-ecosystem: "pip"
+  # Maintain Python dependencies and uv.lock using native uv ecosystem
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
