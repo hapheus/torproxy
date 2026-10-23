@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "torproxy"
-version = "1.4.0"
+version = "1.4.1"
 description = "A minimal HTTP and SOCKS5 proxy routed through the Tor network with local REST control API"
 readme = "README.md"
 requires-python = ">=3.10"
