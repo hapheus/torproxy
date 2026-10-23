@@ -168,3 +168,46 @@ class TestHardenedProductionExample:
         assert "## Quick start" in content
         assert "docker compose down" in content
         assert "curl" in content
+
+
+@pytest.mark.unit
+class TestMacOSChromeExample:
+    """Validate macOS Chrome incognito example compose, script, and documentation."""
+
+    def test_macos_chrome_compose_structure(self):
+        compose_path = os.path.join(EXAMPLES_DIR, "macos-chrome-via-tor", "docker-compose.yml")
+        assert os.path.exists(compose_path), "Missing macos-chrome-via-tor docker-compose.yml"
+        with open(compose_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        assert "services" in data
+        assert "torproxy" in data["services"]
+        svc = data["services"]["torproxy"]
+        assert svc["image"] == "hapheus/torproxy:latest"
+
+        # Check strict localhost port binding
+        ports = svc.get("ports", [])
+        assert ports, "macos-chrome-via-tor torproxy service has no ports defined"
+        for port_spec in ports:
+            assert port_spec.startswith("127.0.0.1:"), f"Unsafe port binding: {port_spec}"
+
+    def test_open_chrome_script_integrity(self):
+        script_path = os.path.join(EXAMPLES_DIR, "macos-chrome-via-tor", "open-chrome.sh")
+        assert os.path.exists(script_path), "Missing open-chrome.sh"
+        with open(script_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "--incognito" in content
+        assert "--proxy-server=" in content
+        assert "--user-data-dir=" in content
+        assert "open -na" in content
+
+    def test_macos_chrome_readme_documentation(self):
+        readme_path = os.path.join(EXAMPLES_DIR, "macos-chrome-via-tor", "README.md")
+        assert os.path.exists(readme_path), "Missing macos-chrome-via-tor README.md"
+        with open(readme_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "## Architecture" in content
+        assert "## Prerequisites" in content
+        assert "## Quick start" in content
+        assert "docker compose down" in content
+        assert "curl" in content
