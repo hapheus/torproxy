@@ -13,6 +13,7 @@
 [![OSV-Scanner](https://github.com/hapheus/torproxy/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/osv-scanner.yml)
 [![CodeQL Analysis](https://github.com/hapheus/torproxy/actions/workflows/codeql.yml/badge.svg)](https://github.com/hapheus/torproxy/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hapheus/torproxy/badge)](https://scorecard.dev/viewer/?uri=github.com/hapheus/torproxy)
+[![OpenSSF Best Practices](https://img.shields.io/cii/percentage/15828?style=flat-square&logo=linuxfoundation&label=OpenSSF%20Best%20Practices)](https://www.bestpractices.dev/projects/15828)
 
 [Quick Start](#quick-start) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
 
