@@ -212,12 +212,10 @@ jobs:
           docker rm -f torproxy-upgrade
           echo "✅ Upgrade compatibility verified."
 
-      - name: Install and Run Trivy Vulnerability Scanner
+      - name: Run Trivy Container Vulnerability Scanner
         run: |
-          echo "Installing Trivy security scanner..."
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
           echo "Scanning container image torproxy:smoke-test for vulnerabilities..."
-          trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0 torproxy:smoke-test
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.59.1 image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0 torproxy:smoke-test
 
       - name: Cleanup Containers
         if: always()
