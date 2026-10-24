@@ -15,14 +15,15 @@ on:
     types:
       - completed
 
-permissions:
-  contents: read
-  issues: write
+permissions: read-all
 
 jobs:
   live-verification:
     name: "Live Tor Canary Verification"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
