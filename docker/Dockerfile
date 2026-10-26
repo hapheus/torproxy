@@ -1,8 +1,8 @@
-FROM alpine:3.21@sha256:ee16d92f96db08d9d2d07da48555a27f3a69d8f0759021dbc601195ed0d2b5bd
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
 LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.description="A minimal HTTP proxy routed through Tor" \
-      org.opencontainers.image.version="1.5.0" \
+      org.opencontainers.image.version="1.6.0" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://github.com/hapheus/torproxy" \
       org.opencontainers.image.url="https://github.com/hapheus/torproxy"
