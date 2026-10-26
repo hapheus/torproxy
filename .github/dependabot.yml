@@ -5,6 +5,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "tuesday"
     commit-message:
       prefix: "ci(deps)"
       include: "scope"
@@ -19,6 +20,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "tuesday"
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
@@ -33,6 +35,7 @@ updates:
     directory: "/docker"
     schedule:
       interval: "weekly"
+      day: "tuesday"
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
