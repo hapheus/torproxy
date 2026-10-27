@@ -82,7 +82,7 @@ curl -X POST http://127.0.0.1:8080/reconnect \
 | --------- | ------------ | ---------------- | ----------- |
 | **HTTP Proxy** | `8118` | Privoxy | HTTP/HTTPS forward proxy routing traffic to Tor. Fails closed (500/503) if Tor is disconnected. |
 | **SOCKS5 Proxy** | `9050` | Tor | Direct Tor SOCKS5 listener. Supports remote DNS resolution via `socks5h://`. |
-| **REST API** | `8080` | Python `api.py` | JSON management and health endpoint. Circuit rotation and connection management. |
+| **REST API** | `8080` | Python REST API | JSON management and health endpoint. Circuit rotation and connection management. |
 
 ---
 

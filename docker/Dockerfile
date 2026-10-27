@@ -25,7 +25,6 @@ ENV PYTHONPATH=/usr/lib/python3/dist-packages \
 COPY src/torproxy /usr/lib/python3/dist-packages/torproxy
 COPY --chmod=755 docker/start.sh /usr/local/bin/start.sh
 COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/healthcheck.sh
-COPY --chmod=755 docker/api.py docker/tor_control.py /usr/local/bin/
 COPY --chmod=644 docker/privoxy.config.template /etc/privoxy/config.template
 COPY --chmod=644 docker/torrc /etc/tor/torrc
 

@@ -3,7 +3,7 @@
 # Container Smoke & Integration Verification Script
 # Validates:
 #   1. Non-root user execution
-#   2. Process supervision (tor, privoxy, api.py)
+#   2. Process supervision (tor, privoxy, api)
 #   3. Multi-port reachability (8118, 9050, 8080)
 #   4. REST API contract & backward compatibility
 #   5. Fail-closed behavior & leak prevention on disconnect
@@ -30,7 +30,7 @@ echo "$PROCS"
 echo "$PROCS" | grep -q "tor" || (echo "❌ tor daemon is not running" && exit 1)
 echo "$PROCS" | grep -q "privoxy" || (echo "❌ privoxy is not running" && exit 1)
 echo "$PROCS" | grep -q "python3" || (echo "❌ API process is not running" && exit 1)
-echo "✅ Daemons verified (tor, privoxy, api.py)."
+echo "✅ Daemons verified (tor, privoxy, api)."
 
 echo "=== 3. REST API Contract Verification ==="
 # Test /status

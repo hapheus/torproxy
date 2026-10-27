@@ -92,7 +92,7 @@ If an upgraded image exhibits unexpected behavior in your environment:
 ## 6. Release Verification Checklist
 
 Maintainers must verify the following checklist before publishing any new version:
-- [ ] All hermetic unit tests pass (`pytest tests/unit/ -v --cov=docker`).
+- [ ] All hermetic unit tests pass (`uv run pytest tests/unit/ -v --cov=torproxy`).
 - [ ] Static analysis passes (`ruff check .` and `shellcheck`).
 - [ ] Container smoke and multi-port verification succeed (`tests/integration/verify_container.sh`).
 - [ ] Backward compatibility upgrade test succeeds with unchanged Compose configuration.
