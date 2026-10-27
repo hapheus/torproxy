@@ -22,7 +22,7 @@ tor_pid=$!
 privoxy --no-daemon /tmp/privoxy.config &
 privoxy_pid=$!
 
-python3 /usr/local/bin/api.py &
+python3 -m torproxy &
 api_pid=$!
 
 # Exit as soon as any critical process exits. tini forwards signals and

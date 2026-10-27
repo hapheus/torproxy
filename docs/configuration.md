@@ -59,7 +59,7 @@ When the container launches, `/usr/local/bin/start.sh` executes the following se
 3. **Daemon Launch:**
    - Launches `tor -f /tmp/torrc` in the background.
    - Launches `privoxy --no-daemon /tmp/privoxy.config` in the background.
-   - Launches `python3 /usr/local/bin/api.py` in the background.
+   - Launches `python3 -m torproxy` in the background.
 4. **Supervision:** Executes `wait -n "$tor_pid" "$privoxy_pid" "$api_pid"`. If any of the three services fails, the script exits immediately, causing `tini` to terminate the container.
 
 ---

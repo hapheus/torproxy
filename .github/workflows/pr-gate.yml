@@ -158,7 +158,7 @@ jobs:
           echo "$PROCS" | grep -q "tor" || (echo "❌ tor daemon is not running" && exit 1)
           echo "$PROCS" | grep -q "privoxy" || (echo "❌ privoxy is not running" && exit 1)
           echo "$PROCS" | grep -q "python3" || (echo "❌ API process is not running" && exit 1)
-          echo "✅ All required daemons (tor, privoxy, api.py) are running."
+          echo "✅ All required daemons (tor, privoxy, api) are running."
 
       - name: Run Multi-Port Integration & Fail-Closed Tests
         run: |
