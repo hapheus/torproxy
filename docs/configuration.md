@@ -15,6 +15,9 @@ All settings have sensible defaults that allow running `torproxy` with zero conf
 | `TORPROXY_HOST_PORT` | `8118` | Integer (1–65535) | Host port mapped to `TORPROXY_LISTEN_PORT` in the default `docker-compose.yml`. |
 | `TORPROXY_COUNTRY` | *(unset)* | Comma-separated ISO codes | 2-letter ISO 3166-1 alpha-2 codes (e.g. `DE`, `AT`, `US`, `DE,AT`) to route exit traffic. |
 | `TORPROXY_STRICT_NODES` | `0` | Boolean (`0`, `1`, `true`, `false`) | When `1`/`true`, strictly reject circuits if no exit relays in selected countries exist. |
+| `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key to secure REST API port `8080`. Recommended for production or shared networks. |
+| `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Permits unauthenticated access to `/health` when `TORPROXY_API_TOKEN` is configured. |
+| `TORPROXY_API_LISTEN_ADDRESS` | `0.0.0.0` | IPv4 address | Address inside the container where the REST API server binds. |
 
 ---
 

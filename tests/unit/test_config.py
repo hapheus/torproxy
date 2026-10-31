@@ -223,3 +223,50 @@ class TestTorrcGeneration:
         content = self._render_torrc({"TORPROXY_EXIT_NODES": "{ch},{nl}"}, tmp_path)
         assert "ExitNodes {ch},{nl}" in content
         assert "StrictNodes 1" in content
+
+
+@pytest.mark.unit
+class TestApiTokenSettings:
+    def test_default_api_token_is_none(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({})
+        assert s.api_token is None
+        assert s.api_allow_anonymous_health is False
+        assert s.api_listen_address == "0.0.0.0"
+
+    def test_api_token_from_env(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({"TORPROXY_API_TOKEN": "secret123"})
+        assert s.api_token == "secret123"
+
+    def test_api_key_fallback(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({"TORPROXY_API_KEY": "secret_key_abc"})
+        assert s.api_token == "secret_key_abc"
+
+    def test_empty_or_whitespace_token_treated_as_none(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({"TORPROXY_API_TOKEN": "   "})
+        assert s.api_token is None
+
+    def test_allow_anonymous_health_parsing(self):
+        from torproxy.configuration import Settings
+
+        s1 = Settings.from_mapping({"TORPROXY_API_ALLOW_ANONYMOUS_HEALTH": "1"})
+        assert s1.api_allow_anonymous_health is True
+
+        s2 = Settings.from_mapping({"TORPROXY_API_ALLOW_ANONYMOUS_HEALTH": "true"})
+        assert s2.api_allow_anonymous_health is True
+
+        s3 = Settings.from_mapping({"TORPROXY_API_ALLOW_ANONYMOUS_HEALTH": "0"})
+        assert s3.api_allow_anonymous_health is False
+
+    def test_api_listen_address_parsing(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({"TORPROXY_API_LISTEN_ADDRESS": "127.0.0.1"})
+        assert s.api_listen_address == "127.0.0.1"

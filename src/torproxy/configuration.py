@@ -63,12 +63,19 @@ class Settings:
     request_timeout: float = 3
     max_body_bytes: int = 16384
     max_workers: int = 32
+    api_token: str | None = None
+    api_allow_anonymous_health: bool = False
+    api_listen_address: str = "0.0.0.0"
 
     def __post_init__(self) -> None:
         try:
             ipaddress.IPv4Address(self.listen_address)
         except ipaddress.AddressValueError:
             raise ValueError("TORPROXY_LISTEN_ADDRESS must be a valid IPv4 address") from None
+        try:
+            ipaddress.IPv4Address(self.api_listen_address)
+        except ipaddress.AddressValueError:
+            raise ValueError("TORPROXY_API_LISTEN_ADDRESS must be a valid IPv4 address") from None
         for name, port in (
             ("TORPROXY_LISTEN_PORT", self.proxy_port),
             ("TORPROXY_API_PORT", self.api_port),
@@ -109,6 +116,14 @@ class Settings:
             except ValueError:
                 raise ValueError(f"{name} must be an integer between 1 and 65535") from None
 
+        raw_token = env.get("TORPROXY_API_TOKEN") or env.get("TORPROXY_API_KEY") or None
+        api_token = raw_token.strip() if raw_token and raw_token.strip() else None
+
+        raw_anon_health = env.get("TORPROXY_API_ALLOW_ANONYMOUS_HEALTH", "0").strip().lower()
+        api_allow_anonymous_health = raw_anon_health in ("1", "true", "yes")
+
+        api_listen_address = env.get("TORPROXY_API_LISTEN_ADDRESS", "0.0.0.0")
+
         return cls(
             listen_address=env.get("TORPROXY_LISTEN_ADDRESS", "0.0.0.0"),
             proxy_port=port("TORPROXY_LISTEN_PORT", 8118),
@@ -121,6 +136,9 @@ class Settings:
             strict_nodes=strict
             if strict is not None
             else bool(nodes or env.get("TORPROXY_EXIT_NODES")),
+            api_token=api_token,
+            api_allow_anonymous_health=api_allow_anonymous_health,
+            api_listen_address=api_listen_address,
         )
 
 

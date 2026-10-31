@@ -8,8 +8,12 @@ The `torproxy` container includes an internal REST API server written in Python.
 - **Default Host Access:** `http://127.0.0.1:8080`
 - **Docker Network Access:** `http://torproxy:8080`
 - **Content-Type:** `application/json`
-- **CORS:** `Access-Control-Allow-Origin: *` is returned on all responses.
-- **Authentication:** None by default. Access must be restricted to trusted networks and loopback interfaces.
+- **CORS:** `Access-Control-Allow-Origin: *` is returned on all responses. `OPTIONS` preflight requests are handled automatically (returning `204 No Content`).
+- **Authentication:** None by default (guaranteeing 100% backward compatibility). When configured via `TORPROXY_API_TOKEN` (or `TORPROXY_API_KEY`), clients must authenticate using standard HTTP headers:
+  - `Authorization: Bearer <token>`
+  - `X-API-Key: <token>`
+  Unauthenticated or invalid requests receive `401 Unauthorized` with `WWW-Authenticate: Bearer realm="torproxy"`.
+  When `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH=1` is enabled, `/health` (and `/v1/health`) allows unauthenticated probing for orchestrators while protecting all other endpoints.
 - **Method Policy:** Both `GET` and `POST` methods are accepted by all endpoints. `POST` is recommended for state mutations (`/connect`, `/disconnect`, `/reconnect`), but `GET` is permanently preserved for backward compatibility.
 
 ---

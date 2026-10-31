@@ -30,5 +30,7 @@ def create_services(
 
 def create_server(settings: Settings, address: tuple[str, int] | None = None) -> ProxyHTTPServer:
     return ProxyHTTPServer(
-        address or ("0.0.0.0", settings.api_port), Router(create_services(settings)), settings
+        address or (settings.api_listen_address, settings.api_port),
+        Router(create_services(settings)),
+        settings,
     )

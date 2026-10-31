@@ -1,5 +1,6 @@
 """Bounded HTTP transport; no application state is shared across servers."""
 
+import hmac
 import json
 import socket
 import threading
@@ -57,17 +58,45 @@ class APIHandler(BaseHTTPRequestHandler):
             raise RequestError(400, "JSON request body must be an object")
         return body
 
+    def _is_authorized(self, path: str) -> bool:
+        expected = self.server.settings.api_token
+        if not expected:
+            return True
+        if self.server.settings.api_allow_anonymous_health and path in ("health", "v1/health"):
+            return True
+
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            if hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
+                return True
+
+        api_key_header = self.headers.get("X-API-Key", "")
+        if api_key_header:
+            token = api_key_header.strip()
+            if hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
+                return True
+
+        return False
+
     def _handle(self) -> None:
         try:
             parsed = urllib.parse.urlsplit(self.path)
-            params = urllib.parse.parse_qs(parsed.query, max_num_fields=32)
-            country = params.get("country", [None])[0]
-            strict = params.get("strict_nodes", params.get("strict", [None]))[0]
-            if self.command == "POST":
-                body = self._body()
-                country = body.get("country", country)
-                strict = body.get("strict_nodes", body.get("strict", strict))
-            response = self.server.router.dispatch(parsed.path.strip("/"), country, strict)
+            clean_path = parsed.path.strip("/")
+            if not self._is_authorized(clean_path):
+                response = Response(
+                    401,
+                    {"error": "Unauthorized", "detail": "Valid Bearer token or X-API-Key required"},
+                )
+            else:
+                params = urllib.parse.parse_qs(parsed.query, max_num_fields=32)
+                country = params.get("country", [None])[0]
+                strict = params.get("strict_nodes", params.get("strict", [None]))[0]
+                if self.command == "POST":
+                    body = self._body()
+                    country = body.get("country", country)
+                    strict = body.get("strict_nodes", body.get("strict", strict))
+                response = self.server.router.dispatch(clean_path, country, strict)
         except RequestError as error:
             response = Response(error.status, {"error": str(error)})
         except ValueError:
@@ -81,6 +110,8 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
+        if response.status == 401:
+            self.send_header("WWW-Authenticate", 'Bearer realm="torproxy"')
         self.end_headers()
         try:
             self.wfile.write(payload)
@@ -93,6 +124,18 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         self._handle()
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Authorization, X-API-Key, Content-Type, Accept",
+        )
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
 
 class ProxyHTTPServer(ThreadingHTTPServer):
