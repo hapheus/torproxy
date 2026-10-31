@@ -78,7 +78,7 @@ To protect users against upstream vulnerabilities and supply chain compromises:
 3. **False Positive & Exception Process**:
    - Any accepted risk or scanner false-positive must be documented in a `.trivyignore` file with an issue link, rationale, and expiration date.
 4. **Base Image Updates**:
-   - The container builds upon `alpine:3.21`. Security patches for `tor`, `privoxy`, `curl`, and `ca-certificates` are pulled directly from Alpine security mirrors during build.
+   - The container builds upon a supported Alpine Linux base image (pinned by digest). Security patches for `tor`, `privoxy`, `curl`, and `ca-certificates` are pulled directly from Alpine security mirrors during build.
 
 ---
 
