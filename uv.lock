@@ -842,7 +842,7 @@ wheels = [
 
 [[package]]
 name = "torproxy"
-version = "1.6.0"
+version = "1.7.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
