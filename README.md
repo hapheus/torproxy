@@ -102,6 +102,7 @@ The lightweight API server on port `8080` manages circuits and monitors health w
 | `/connect` | `POST` (or `GET`) | `200`, `400` | Resume Tor network traffic (`DisableNetwork=0`). Supports `?country=DE` or JSON body. | `{"action":"connect","status":"success"}` |
 
 > **HTTP Methods:** `POST` is recommended for state mutations (`/reconnect`, `/disconnect`, `/connect`). Legacy `GET` calls remain fully supported for backward compatibility.
+> **Authentication (Recommended):** Unauthenticated by default for backward compatibility. Setting `TORPROXY_API_TOKEN` (or `TORPROXY_API_KEY`) protects all endpoints with `Authorization: Bearer <token>` or `X-API-Key: <token>`.
 > Detailed schema definitions are documented in [docs/api.md](docs/api.md).
 
 ---
@@ -140,6 +141,8 @@ Default settings require no configuration. You can customize listening ports and
 | `TORPROXY_SOCKS_PORT` | `9050` | `1024`–`65535` | Tor SOCKS5 proxy port (host and container). |
 | `TORPROXY_COUNTRY` | *(unset)* | ISO 3166-1 alpha-2 (e.g. `DE`, `AT`, `US`, `DE,AT`) | Route Tor exit circuits through specific countries using `tor-geoipdb`. |
 | `TORPROXY_STRICT_NODES` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
+| `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API port 8080. Recommended for production. |
+| `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | `0`, `1`, `true`, `false` | Optional: Allow unauthenticated `/health` probing when `TORPROXY_API_TOKEN` is set. |
 
 All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
 
