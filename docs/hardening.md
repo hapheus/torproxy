@@ -25,18 +25,18 @@ Prevent attackers or rogue processes from modifying system binaries or writing p
 - `/var/log/privoxy`: Privoxy runtime logging.
 
 ### B. Dropping Linux Capabilities (`cap_drop: [ALL]`)
-In standard proxy mode, `torproxy` does not require any Linux capabilities (such as `CAP_NET_ADMIN`, `CAP_SYS_ADMIN`, or `CAP_CHOWN`). All capabilities can be dropped safely.
+In standard proxy mode, `torproxy` does not require any Linux capabilities (such as `CAP_NET_ADMIN` or `CAP_SYS_ADMIN`). The container init starts as root only to drop privileges — every daemon runs as an unprivileged user (`tor`, `privoxy`, `torproxy`). Dropping privileges via `su` needs `CAP_SETUID`/`CAP_SETGID` at startup only (no other caps), so the hardened recipe is `cap_drop: [ALL]` + `cap_add: [SETUID, SETGID]` + `no-new-privileges: true`.
 
 > [!NOTE]
 > **Gateway Mode Capability Requirement:**
-> When running in transparent gateway mode (`TORPROXY_GATEWAY_MODE=true`), the container requires `cap_add: [NET_ADMIN]` to install `iptables` redirection and kill switch rules in its network namespace. Linux file capabilities (`setcap`) are baked into the image so the container still executes strictly as unprivileged user `torproxy` (UID 102).
+> When running in transparent gateway mode (`TORPROXY_GATEWAY_MODE=true`), the container requires `cap_add: [NET_ADMIN]` to install `iptables` redirection and kill switch rules in its network namespace.
 
 ### C. Preventing Privilege Escalation (`no-new-privileges:true`)
 Ensures that container processes cannot gain additional privileges via setuid or setgid binaries.
 
 > [!IMPORTANT]
 > **Gateway Mode Incompatibility with `no-new-privileges`:**
-> Do NOT set `security_opt: [no-new-privileges:true]` when running in transparent gateway mode (`TORPROXY_GATEWAY_MODE=true`). The Linux kernel ignores file capabilities (`setcap`) when `no-new-privileges` is set, which prevents the unprivileged `torproxy` user (UID 102) from configuring `iptables`.
+> Do NOT set `security_opt: [no-new-privileges:true]` when running in transparent gateway mode (`TORPROXY_GATEWAY_MODE=true`). The kill-switch `iptables` rules are installed by the root init (which then drops privileges), so gateway mode keeps working, but `no-new-privileges` is not required there.
 
 ---
 

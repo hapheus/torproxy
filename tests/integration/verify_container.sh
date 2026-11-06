@@ -16,13 +16,17 @@ HTTP_PORT="${3:-8118}"
 SOCKS_PORT="${4:-9050}"
 
 echo "=== 1. Non-Root Execution Verification ==="
-CONTAINER_UID=$(docker exec "$CONTAINER_NAME" id -u)
-echo "Container User UID: $CONTAINER_UID"
-if [ "$CONTAINER_UID" -eq 0 ]; then
-  echo "❌ CRITICAL SECURITY ERROR: Container is running as root (UID 0)!"
+# ISSUE-03: the init runs as root only to drop privileges; every daemon
+# must run as an unprivileged user (tor, privoxy, torproxy).
+PIDS=$(docker exec "$CONTAINER_NAME" sh -c 'for p in /proc/[0-9]*; do c=$(cat "$p/comm" 2>/dev/null); u=$(stat -c %u "$p" 2>/dev/null); [ -n "$u" ] && echo "$c $u"; done')
+echo "$PIDS"
+echo "$PIDS" | grep -E "^(tor|privoxy) [1-9][0-9]*$" > /dev/null || (echo "❌ tor/privoxy not running unprivileged" && exit 1)
+echo "$PIDS" | grep -E "^python3 [1-9][0-9]*$" > /dev/null || (echo "❌ API not running unprivileged" && exit 1)
+if echo "$PIDS" | grep -E "^(tor|privoxy|python3) 0$" > /dev/null; then
+  echo "❌ CRITICAL SECURITY ERROR: a daemon is running as root (UID 0)!"
   exit 1
 fi
-echo "✅ Non-root user execution verified (UID: $CONTAINER_UID)."
+echo "✅ All daemons run as unprivileged users."
 
 echo "=== 2. Daemon Process Verification ==="
 PROCS=$(docker top "$CONTAINER_NAME")

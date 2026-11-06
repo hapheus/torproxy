@@ -106,6 +106,8 @@ services:
 - **Zero Application Changes:** No need to configure `HTTP_PROXY`, `ALL_PROXY`, or browser arguments.
 - **Tor DNSPort (:9053):** All DNS requests on port 53 (UDP & TCP) are automatically resolved via Tor to prevent DNS leaks.
 - **Fail-Closed Netfilter Kill Switch:** All direct clearnet traffic is blocked. If Tor stops or disconnects, connections fail closed immediately.
+- **Process-Scoped WAN Bypass:** Only the dedicated unprivileged `tor` user may reach the WAN (`owner --uid-owner`); the API, Privoxy, and attached app containers cannot bypass the kill switch.
+- **IPv6:** Tor may bootstrap over IPv6 (its own exception); every other process remains blocked — no IPv6 clearnet leaks.
 - **UDP Protection:** Unsupported non-DNS UDP traffic (e.g. QUIC/HTTP-3) is blocked with ICMP port-unreachable, ensuring fast fallback to TCP without hangs.
 - See the ready-to-run [Transparent Gateway Example](examples/transparent-tor-gateway/) for details.
 
@@ -204,7 +206,7 @@ Ready-to-run use cases with hardened configurations:
 
 ## Security Model and Trust Boundaries
 
-- **Non-Root Execution**: Container processes run strictly under the unprivileged system user `torproxy`.
+- **Non-Root Execution**: The container init starts as root only to drop privileges — every daemon runs as an unprivileged user (`tor`, `privoxy`, `torproxy`). In gateway mode the netfilter WAN bypass is scoped to the dedicated `tor` UID, so the API/Privoxy cannot reach the WAN directly (ISSUE-03).
 - **Authenticated ControlPort**: Tor's control port (`127.0.0.1:9051`) requires ephemeral filesystem cookie authentication (`CookieAuthentication 1`).
 - **Fail-Closed Guarantee**: If Tor disconnects or crashes, Privoxy drops traffic and returns HTTP 503 instead of leaking to clearnet.
 - **DNS Leak Prevention**: To prevent local DNS leaks, always use remote DNS resolution with SOCKS5 (`curl --socks5-hostname 127.0.0.1:9050` or `socks5h://`).
