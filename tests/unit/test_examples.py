@@ -229,6 +229,7 @@ class TestTransparentGatewayExample:
 
         tor_svc = data["services"]["torproxy"]
         assert tor_svc["image"] == "hapheus/torproxy:latest"
+        assert tor_svc.get("pull_policy") == "always"
         assert tor_svc.get("cap_add") == ["NET_ADMIN"]
         assert tor_svc.get("environment", {}).get("TORPROXY_GATEWAY_MODE") == "true"
 

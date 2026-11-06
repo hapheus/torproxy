@@ -52,6 +52,7 @@ To route any service through the gateway, set `network_mode: "service:torproxy"`
 services:
   torproxy:
     image: hapheus/torproxy:latest
+    pull_policy: always
     cap_add:
       - NET_ADMIN
     environment:

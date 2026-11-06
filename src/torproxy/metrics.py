@@ -5,7 +5,12 @@ from collections.abc import Mapping
 from torproxy.state import Snapshot
 
 
-def render_metrics(snapshot: Snapshot, bootstrap: Mapping | None, socks: bool) -> str:
+def render_metrics(
+    snapshot: Snapshot,
+    bootstrap: Mapping | None,
+    socks: bool,
+    gateway_mode: bool = False,
+) -> str:
     values = (
         (
             "uptime_seconds",
@@ -32,6 +37,12 @@ def render_metrics(snapshot: Snapshot, bootstrap: Mapping | None, socks: bool) -
             bootstrap.get("progress", 0) if bootstrap else 0,
         ),
         ("socks5_ready", "SOCKS5 listener probe (1=ready, 0=down)", "gauge", int(socks)),
+        (
+            "gateway_mode",
+            "Transparent Tor gateway mode status (1=enabled, 0=disabled)",
+            "gauge",
+            int(gateway_mode),
+        ),
         (
             "strict_nodes",
             "Tor StrictNodes setting (1=strict, 0=flexible)",

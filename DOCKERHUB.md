@@ -72,6 +72,7 @@ docker run -d \
 services:
   torproxy:
     image: hapheus/torproxy:latest
+    pull_policy: always
     cap_add:
       - NET_ADMIN
     environment:

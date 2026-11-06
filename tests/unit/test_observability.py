@@ -59,6 +59,11 @@ class TestDiagnosticsEndpoint:
                     assert data["proxies"]["socks_port"] == 9050
                     assert data["proxies"]["http_port"] == 8118
 
+                    assert "gateway" in data
+                    assert data["gateway"]["enabled"] is False
+                    assert data["gateway"]["trans_port"] == 9040
+                    assert data["gateway"]["dns_port"] == 9053
+
                     assert "egress" in data
                     assert data["egress"]["verified"] is True
                     assert data["egress"]["ip"] == "185.220.101.5"
@@ -146,6 +151,7 @@ class TestMetricsEndpoint:
                     assert "torproxy_tor_bootstrapped 1" in body
                     assert "torproxy_tor_bootstrap_progress 100" in body
                     assert "torproxy_socks5_ready 1" in body
+                    assert "torproxy_gateway_mode 0" in body
                     assert "torproxy_strict_nodes 0" in body
                     assert 'torproxy_exit_country_info{country=""} 1' in body
 

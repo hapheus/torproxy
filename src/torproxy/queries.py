@@ -134,6 +134,11 @@ class ProxyQueries:
                     "socks_port": self.service.settings.socks_port,
                     "http_port": self.service.settings.proxy_port,
                 },
+                "gateway": {
+                    "enabled": self.service.settings.gateway_mode,
+                    "trans_port": self.service.settings.trans_port,
+                    "dns_port": self.service.settings.dns_port,
+                },
                 "egress": {"verified": bool(ip), "ip": ip, "error": ip_error if not ip else None},
             },
         )

@@ -57,6 +57,7 @@ class Router:
                 self.service.state.snapshot(),
                 bootstrap,
                 self.service.check_socks5_ready(),
+                self.service.settings.gateway_mode,
             ),
             "text/plain; version=0.0.4; charset=utf-8",
         )
