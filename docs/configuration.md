@@ -18,6 +18,9 @@ All settings have sensible defaults that allow running `torproxy` with zero conf
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key to secure REST API port `8080`. Recommended for production or shared networks. |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Permits unauthenticated access to `/health` when `TORPROXY_API_TOKEN` is configured. |
 | `TORPROXY_API_LISTEN_ADDRESS` | `0.0.0.0` | IPv4 address | Address inside the container where the REST API server binds. |
+| `TORPROXY_GATEWAY_MODE` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Enables transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
+| `TORPROXY_TRANS_PORT` | `9040` | Integer (1–65535) | TCP port inside the container where Tor's transparent proxy listener (`TransPort`) binds when gateway mode is active. |
+| `TORPROXY_DNS_PORT` | `9053` | Integer (1–65535) | UDP/TCP port inside the container where Tor's internal DNS resolver (`DNSPort`) binds when gateway mode is active. |
 
 ---
 

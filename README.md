@@ -15,7 +15,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hapheus/torproxy/badge)](https://scorecard.dev/viewer/?uri=github.com/hapheus/torproxy)
 [![OpenSSF Best Practices](https://img.shields.io/cii/percentage/15828?style=flat-square&logo=linuxfoundation&label=OpenSSF%20Best%20Practices)](https://www.bestpractices.dev/projects/15828)
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
+[Quick Start](#quick-start) · [Transparent Gateway](#transparent-tor-gateway) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -76,6 +76,40 @@ curl -X POST http://127.0.0.1:8080/reconnect \
 
 ---
 
+## 🚀 Transparent Tor Gateway
+
+Route **any** existing Docker container's entire outbound TCP and DNS traffic automatically through Tor — **without modifying your applications or adding proxy flags**.
+
+```yaml
+services:
+  torproxy:
+    image: hapheus/torproxy:latest
+    cap_add:
+      - NET_ADMIN
+    environment:
+      TORPROXY_GATEWAY_MODE: "true"
+      TORPROXY_COUNTRY: ${TORPROXY_COUNTRY:-}
+    restart: unless-stopped
+
+  # Attach any application container directly to torproxy's network namespace:
+  my-app:
+    image: curlimages/curl:latest
+    network_mode: "service:torproxy"
+    depends_on:
+      torproxy:
+        condition: service_healthy
+    command: ["-s", "https://check.torproject.org/api/ip"]
+```
+
+### Why use Transparent Gateway mode?
+- **Zero Application Changes:** No need to configure `HTTP_PROXY`, `ALL_PROXY`, or browser arguments.
+- **Tor DNSPort (:9053):** All DNS requests on port 53 (UDP & TCP) are automatically resolved via Tor to prevent DNS leaks.
+- **Fail-Closed Netfilter Kill Switch:** All direct clearnet traffic is blocked. If Tor stops or disconnects, connections fail closed immediately.
+- **UDP Protection:** Unsupported non-DNS UDP traffic (e.g. QUIC/HTTP-3) is blocked with ICMP port-unreachable, ensuring fast fallback to TCP without hangs.
+- See the ready-to-run [Transparent Gateway Example](examples/transparent-tor-gateway/) for details.
+
+---
+
 ## Available Interfaces and Ports
 
 | Interface | Default Port | Internal Service | Description |
@@ -83,6 +117,8 @@ curl -X POST http://127.0.0.1:8080/reconnect \
 | **HTTP Proxy** | `8118` | Privoxy | HTTP/HTTPS forward proxy routing traffic to Tor. Fails closed (500/503) if Tor is disconnected. |
 | **SOCKS5 Proxy** | `9050` | Tor | Direct Tor SOCKS5 listener. Supports remote DNS resolution via `socks5h://`. |
 | **REST API** | `8080` | Python REST API | JSON management and health endpoint. Circuit rotation and connection management. |
+| **TransPort** *(Gateway Mode)* | `9040` | Tor | Transparent TCP proxy redirect listener when `TORPROXY_GATEWAY_MODE=true`. |
+| **DNSPort** *(Gateway Mode)* | `9053` | Tor | Transparent DNS resolver listener when `TORPROXY_GATEWAY_MODE=true`. |
 
 ---
 
@@ -143,6 +179,9 @@ Default settings require no configuration. You can customize listening ports and
 | `TORPROXY_STRICT_NODES` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API port 8080. Recommended for production. |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | `0`, `1`, `true`, `false` | Optional: Allow unauthenticated `/health` probing when `TORPROXY_API_TOKEN` is set. |
+| `TORPROXY_GATEWAY_MODE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Enable Transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
+| `TORPROXY_TRANS_PORT` | `9040` | `1024`–`65535` | Listening port for Tor TransPort when gateway mode is enabled. |
+| `TORPROXY_DNS_PORT` | `9053` | `1024`–`65535` | Listening port for Tor DNSPort when gateway mode is enabled. |
 
 All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
 
@@ -154,6 +193,7 @@ Ready-to-run use cases with hardened configurations:
 
 | Example | Purpose | Guide |
 | ------- | ------- | ----- |
+| **Transparent Tor Gateway** | Route any container's entire TCP & DNS traffic automatically through Tor without proxy settings. | [View Example](examples/transparent-tor-gateway/) |
 | **Hardened Production** | Read-only rootfs, dropped capabilities, and memory-backed tmpfs. | [View Example](examples/hardened-production/) |
 | **Browserless Chromium** | Headless browser automation and scraping routed through Tor. | [View Example](examples/browserless-chromium-via-tor/) |
 | **CRW Web Scraper** | High-performance webpage-to-Markdown scraper via Tor proxy. | [View Example](examples/crw-web-scraper-via-tor/) |

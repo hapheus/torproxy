@@ -6,6 +6,7 @@ This collection shows how Docker applications can route outbound HTTP traffic th
 
 | Use case | What it demonstrates | Start here |
 | --- | --- | --- |
+| Transparent Tor Gateway | Route any container's entire outbound TCP and DNS traffic transparently through Tor using `network_mode: "service:torproxy"` — zero application configuration, fail-closed kill switch. | [Transparent Tor Gateway](transparent-tor-gateway/README.md) |
 | Production Hardening | Minimal privileges, `cap_drop: [ALL]`, `no-new-privileges: true`, read-only volumes, and production health monitoring. | [Production Hardened Tor Proxy](hardened-production/README.md) |
 | macOS Chrome Incognito | Launch Google Chrome or Chromium on macOS in an isolated, anonymous Incognito window routed through Tor with pure terminal commands. | [macOS Chrome Incognito through Tor](macos-chrome-via-tor/README.md) |
 | Browser automation through Tor | Browserless Chromium loads web pages through the Tor HTTP proxy. Useful for authorised browser testing, privacy-conscious automation, and reproducible egress-IP checks. | [Browserless Chromium through Tor](browserless-chromium-via-tor/README.md) |

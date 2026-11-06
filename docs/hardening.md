@@ -25,7 +25,11 @@ Prevent attackers or rogue processes from modifying system binaries or writing p
 - `/var/log/privoxy`: Privoxy runtime logging.
 
 ### B. Dropping Linux Capabilities (`cap_drop: [ALL]`)
-`torproxy` does not require any Linux capabilities (such as `CAP_NET_ADMIN`, `CAP_SYS_ADMIN`, or `CAP_CHOWN`). All capabilities can be dropped safely.
+In standard proxy mode, `torproxy` does not require any Linux capabilities (such as `CAP_NET_ADMIN`, `CAP_SYS_ADMIN`, or `CAP_CHOWN`). All capabilities can be dropped safely.
+
+> [!NOTE]
+> **Gateway Mode Capability Requirement:**
+> When running in transparent gateway mode (`TORPROXY_GATEWAY_MODE=true`), the container requires `cap_add: [NET_ADMIN]` to install `iptables` redirection and kill switch rules in its network namespace. Linux file capabilities (`setcap`) are baked into the image so the container still executes strictly as unprivileged user `torproxy` (UID 102).
 
 ### C. Preventing Privilege Escalation (`no-new-privileges:true`)
 Ensures that container processes cannot gain additional privileges via setuid or setgid binaries.
@@ -42,15 +46,15 @@ services:
     image: hapheus/torproxy:latest
     container_name: torproxy-hardened
     restart: unless-stopped
-    
+
     # 1. Prevent privilege escalation
     security_opt:
       - no-new-privileges:true
-      
+
     # 2. Drop all Linux kernel capabilities
     cap_drop:
       - ALL
-      
+
     # 3. Bind published ports strictly to host loopback interface
     ports:
       - "127.0.0.1:8118:8118"

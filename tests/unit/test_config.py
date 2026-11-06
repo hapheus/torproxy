@@ -270,3 +270,90 @@ class TestApiTokenSettings:
 
         s = Settings.from_mapping({"TORPROXY_API_LISTEN_ADDRESS": "127.0.0.1"})
         assert s.api_listen_address == "127.0.0.1"
+
+
+@pytest.mark.unit
+class TestGatewaySettings:
+    def test_default_gateway_settings(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({})
+        assert s.gateway_mode is False
+        assert s.trans_port == 9040
+        assert s.dns_port == 9053
+
+    @pytest.mark.parametrize("val", ["1", "true", "yes", "TRUE", "True"])
+    def test_gateway_mode_enabled_truthy(self, val):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({"TORPROXY_GATEWAY_MODE": val})
+        assert s.gateway_mode is True
+
+    @pytest.mark.parametrize("val", ["0", "false", "no", "FALSE", "False", ""])
+    def test_gateway_mode_disabled_falsy(self, val):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({"TORPROXY_GATEWAY_MODE": val})
+        assert s.gateway_mode is False
+
+    def test_custom_gateway_ports(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping(
+            {
+                "TORPROXY_GATEWAY_MODE": "1",
+                "TORPROXY_TRANS_PORT": "9041",
+                "TORPROXY_DNS_PORT": "9054",
+            }
+        )
+        assert s.trans_port == 9041
+        assert s.dns_port == 9054
+
+    @pytest.mark.parametrize("invalid_port", ["0", "65536", "-5", "abc"])
+    def test_invalid_gateway_ports(self, invalid_port):
+        from torproxy.configuration import Settings
+
+        with pytest.raises(
+            ValueError, match="must be an integer between 1 and 65535|must be between 1 and 65535"
+        ):
+            Settings.from_mapping(
+                {
+                    "TORPROXY_GATEWAY_MODE": "1",
+                    "TORPROXY_TRANS_PORT": invalid_port,
+                }
+            )
+
+    def test_gateway_port_collision_with_socks(self):
+        from torproxy.configuration import Settings
+
+        with pytest.raises(ValueError, match="distinct ports"):
+            Settings.from_mapping(
+                {
+                    "TORPROXY_GATEWAY_MODE": "1",
+                    "TORPROXY_TRANS_PORT": "9050",  # collides with socks_port default 9050
+                }
+            )
+
+    def test_render_torrc_with_gateway_mode(self):
+        from torproxy.configuration import Settings, render_torrc
+
+        template = "SocksPort 0.0.0.0:__TORPROXY_SOCKS_PORT__\nControlPort 127.0.0.1:9051\n"
+        settings = Settings.from_mapping(
+            {
+                "TORPROXY_GATEWAY_MODE": "1",
+                "TORPROXY_TRANS_PORT": "9040",
+                "TORPROXY_DNS_PORT": "9053",
+            }
+        )
+        rendered = render_torrc(settings, template)
+        assert "TransPort 127.0.0.1:9040" in rendered
+        assert "DNSPort 127.0.0.1:9053" in rendered
+
+    def test_render_torrc_without_gateway_mode(self):
+        from torproxy.configuration import Settings, render_torrc
+
+        template = "SocksPort 0.0.0.0:__TORPROXY_SOCKS_PORT__\nControlPort 127.0.0.1:9051\n"
+        settings = Settings.from_mapping({"TORPROXY_GATEWAY_MODE": "0"})
+        rendered = render_torrc(settings, template)
+        assert "TransPort" not in rendered
+        assert "DNSPort" not in rendered

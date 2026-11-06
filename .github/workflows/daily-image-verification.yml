@@ -278,6 +278,35 @@ jobs:
           fi
 
       # -------------------------------------------------------------
+      # 6b. Transparent Tor Gateway Mode verification
+      # -------------------------------------------------------------
+      - name: Verify Transparent Tor Gateway Mode
+        run: |
+          IMAGE_TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          IMAGE_NAME="hapheus/torproxy:${IMAGE_TAG}"
+          echo "Starting torproxy in Gateway Mode..."
+          docker run -d \
+            --name torproxy-canary-gateway \
+            --cap-add=NET_ADMIN \
+            -e TORPROXY_GATEWAY_MODE=true \
+            -p 8089:8080 \
+            "$IMAGE_NAME"
+
+          echo "Waiting for Gateway Tor bootstrap..."
+          for i in {1..36}; do
+            STATUS=$(curl -s --connect-timeout 5 http://localhost:8089/status | jq -r '.status // empty' || true)
+            if [ "$STATUS" = "connected" ]; then
+              echo "✅ Gateway Tor successfully connected!"
+              break
+            fi
+            sleep 5
+          done
+
+          chmod +x tests/integration/verify_gateway.sh
+          ./tests/integration/verify_gateway.sh torproxy-canary-gateway
+          docker rm -f torproxy-canary-gateway
+
+      # -------------------------------------------------------------
       # 7. Generate Step Summary
       # -------------------------------------------------------------
       - name: Generate Step Summary
@@ -298,6 +327,8 @@ jobs:
         run: |
           echo "=== torproxy-canary Docker Logs ==="
           docker logs torproxy-canary || true
+          echo "=== torproxy-canary-gateway Docker Logs ==="
+          docker logs torproxy-canary-gateway || true
 
       # -------------------------------------------------------------
       # 8. Stop and clean up container
@@ -306,8 +337,8 @@ jobs:
         if: always()
         run: |
           echo "Stopping and cleaning up container..."
-          docker stop torproxy-canary || true
-          docker rm torproxy-canary || true
+          docker stop torproxy-canary torproxy-canary-gateway || true
+          docker rm torproxy-canary torproxy-canary-gateway || true
 
       # -------------------------------------------------------------
       # 9. Failure Notification: create or update Issue

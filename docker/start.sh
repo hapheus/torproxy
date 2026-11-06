@@ -15,6 +15,7 @@ trap shutdown SIGTERM SIGINT EXIT
 
 validate_configuration
 python3 -m torproxy.runtime.configure
+python3 -m torproxy.runtime.gateway
 
 tor -f /tmp/torrc &
 tor_pid=$!
