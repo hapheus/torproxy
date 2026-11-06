@@ -291,6 +291,24 @@ class TestEnvironmentAndDefaultsContract:
         assert "127.0.0.1:${TORPROXY_API_PORT:-8080}:${TORPROXY_API_PORT:-8080}" in compose
         assert "127.0.0.1:${TORPROXY_SOCKS_PORT:-9050}:${TORPROXY_SOCKS_PORT:-9050}" in compose
 
+    def test_version_single_source_of_truth(self):
+        # ISSUE-07: __version__, pyproject.toml and the image label must agree.
+        import torproxy
+
+        pyproject_path = os.path.join(REPO_ROOT, "pyproject.toml")
+        with open(pyproject_path, "r", encoding="utf-8") as f:
+            pyproject = f.read()
+        match = re.search(r'^version = "([^"]+)"', pyproject, re.MULTILINE)
+        assert match is not None
+        project_version = match.group(1)
+
+        dockerfile_path = os.path.join(DOCKER_DIR, "Dockerfile")
+        with open(dockerfile_path, "r", encoding="utf-8") as f:
+            dockerfile = f.read()
+        assert f'org.opencontainers.image.version="{project_version}"' in dockerfile
+
+        assert torproxy.__version__ == project_version
+
 
 @pytest.mark.unit
 class TestComposeExamplesContract:
