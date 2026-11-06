@@ -10,3 +10,6 @@
 !src/torproxy/**
 **/__pycache__
 **/*.pyc
+# pyproject.toml ships into the image so torproxy.__version__ resolves
+# from the single source of truth at runtime (ISSUE-07).
+!pyproject.toml

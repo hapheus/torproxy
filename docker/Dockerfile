@@ -25,6 +25,9 @@ ENV PYTHONPATH=/usr/lib/python3/dist-packages \
     TORPROXY_SOCKS_PORT=9050
 
 COPY src/torproxy /usr/lib/python3/dist-packages/torproxy
+# Ship pyproject.toml so torproxy.__version__ resolves from the single source
+# of truth (pyproject.toml) inside the image as well (ISSUE-07).
+COPY pyproject.toml /usr/lib/python3/dist-packages/pyproject.toml
 COPY --chmod=755 docker/start.sh /usr/local/bin/start.sh
 COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/healthcheck.sh
 COPY --chmod=644 docker/privoxy.config.template /etc/privoxy/config.template
