@@ -91,6 +91,12 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.1.0 (Sprint 2: gateway security architecture)
+
+- **Kill-switch fail-closed restored (ISSUE-02):** removed the unrestricted `ESTABLISHED,RELATED` accept from filter OUTPUT; pre-existing clearnet connections no longer survive a Tor outage.
+- **Least privilege for the WAN bypass (ISSUE-03):** the container init runs as root only to drop privileges — Tor runs as the dedicated unprivileged `tor` user, Privoxy as `privoxy`, the API as `torproxy`. Gateway netfilter now scopes the WAN bypass to the `tor` UID, so the API/Privoxy cannot reach the WAN directly. Tor gets a scoped IPv6 exception (IPv6-only bootstrap fixed) while the IPv6 policy stays DROP.
+- **Idempotent gateway setup (ISSUE-05):** `setup_gateway` probes each rule with `-C` before appending; container restarts in gateway mode no longer fail on duplicate rules.
+
 ### 2.0.2 (Sprint 1: security & contract fixes)
 
 - **CSRF protection on mutations (ISSUE-01):** `/connect`, `/disconnect`, `/reconnect` presented with a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden`. Requests without those headers (curl, scripts, healthchecks) are unaffected. Wildcard CORS is now sent only on successful non-mutating responses.
