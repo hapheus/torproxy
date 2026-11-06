@@ -309,6 +309,35 @@ class TestEnvironmentAndDefaultsContract:
 
         assert torproxy.__version__ == project_version
 
+    def test_compiled_artifacts_ignored_everywhere(self):
+        # ISSUE-16: no .pyc/__pycache__ may leak into the repo or the image.
+        gitignore_path = os.path.join(REPO_ROOT, ".gitignore")
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            gitignore = f.read()
+        for entry in (
+            "__pycache__/",
+            "*.py[cod]",
+            ".mypy_cache/",
+            ".pytest_cache/",
+            ".ruff_cache/",
+            ".coverage",
+        ):
+            assert entry in gitignore, f".gitignore missing {entry}"
+
+        dockerignore_path = os.path.join(REPO_ROOT, ".dockerignore")
+        with open(dockerignore_path, "r", encoding="utf-8") as f:
+            dockerignore = f.read()
+        assert "**/__pycache__" in dockerignore
+        assert "**/*.pyc" in dockerignore
+
+        import subprocess
+
+        tracked = subprocess.run(
+            ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+        ).stdout
+        assert "__pycache__" not in tracked
+        assert not any(line.endswith(".pyc") for line in tracked.splitlines())
+
 
 @pytest.mark.unit
 class TestComposeExamplesContract:
