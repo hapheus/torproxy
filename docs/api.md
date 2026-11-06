@@ -8,13 +8,14 @@ The `torproxy` container includes an internal REST API server written in Python.
 - **Default Host Access:** `http://127.0.0.1:8080`
 - **Docker Network Access:** `http://torproxy:8080`
 - **Content-Type:** `application/json`
-- **CORS:** `Access-Control-Allow-Origin: *` is returned on all responses. `OPTIONS` preflight requests are handled automatically (returning `204 No Content`).
+- **CORS:** `Access-Control-Allow-Origin: *` is returned on successful read responses (`/status`, `/ip`, `/health`, `/metrics`, …). It is intentionally **not** sent on error responses (`401`, `403`, `4xx`/`5xx`) and never on mutations (`/connect`, `/disconnect`, `/reconnect`). `OPTIONS` preflight requests are handled automatically (returning `204 No Content`); preflight for mutations omits the wildcard header so foreign origins cannot read or trigger state changes.
+- **CSRF protection on mutations:** Mutations (`/connect`, `/disconnect`, `/reconnect`, via `GET` or `POST`) presented with a browser `Origin` or `Referer` header whose host differs from the request `Host` are rejected with `403 Forbidden`. Requests without these headers (curl, scripts, Docker healthchecks) are unaffected, preserving the legacy `GET`-mutation contract. `POST` is still recommended.
 - **Authentication:** None by default (guaranteeing 100% backward compatibility). When configured via `TORPROXY_API_TOKEN` (or `TORPROXY_API_KEY`), clients must authenticate using standard HTTP headers:
   - `Authorization: Bearer <token>`
   - `X-API-Key: <token>`
   Unauthenticated or invalid requests receive `401 Unauthorized` with `WWW-Authenticate: Bearer realm="torproxy"`.
   When `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH=1` is enabled, `/health` (and `/v1/health`) allows unauthenticated probing for orchestrators while protecting all other endpoints.
-- **Method Policy:** Both `GET` and `POST` methods are accepted by all endpoints. `POST` is recommended for state mutations (`/connect`, `/disconnect`, `/reconnect`), but `GET` is permanently preserved for backward compatibility.
+- **Method Policy:** Both `GET` and `POST` methods are accepted by all endpoints. `POST` is recommended for state mutations (`/connect`, `/disconnect`, `/reconnect`), but `GET` is permanently preserved for backward compatibility. Mutations carrying a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden` (CSRF protection); mutations without those headers (curl, scripts) keep working unchanged.
 
 ---
 
