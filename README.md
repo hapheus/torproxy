@@ -84,6 +84,7 @@ Route **any** existing Docker container's entire outbound TCP and DNS traffic au
 services:
   torproxy:
     image: hapheus/torproxy:latest
+    pull_policy: always
     cap_add:
       - NET_ADMIN
     environment:

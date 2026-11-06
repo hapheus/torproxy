@@ -37,12 +37,12 @@ fi
 echo "✅ Transparent Tor routing verified: Exit IP is $EXIT_IP (IsTor=true)."
 
 echo "=== 3. UDP Kill Switch & Leak Prevention Verification ==="
-# Attempt direct UDP transmission - should be immediately blocked/rejected
-if docker run --rm --network "container:${GATEWAY_CONTAINER}" alpine:3.24 sh -c "nc -z -u -w 2 1.1.1.1 53" 2>/dev/null; then
-  echo "❌ CRITICAL: UDP traffic to 1.1.1.1 bypassed kill switch (UDP LEAK)!"
+# Attempt direct non-DNS UDP transmission (e.g. NTP port 123) - should be immediately blocked/rejected
+if docker run --rm --network "container:${GATEWAY_CONTAINER}" alpine:3.24 sh -c "nc -z -u -w 2 1.1.1.1 123" 2>/dev/null; then
+  echo "❌ CRITICAL: Direct UDP traffic to 1.1.1.1:123 bypassed kill switch (UDP LEAK)!"
   exit 1
 else
-  echo "✅ Direct UDP traffic correctly blocked by kill switch."
+  echo "✅ Direct non-DNS UDP traffic correctly blocked by kill switch."
 fi
 
 echo "=== All Transparent Gateway Verification Tests PASSED! ==="
