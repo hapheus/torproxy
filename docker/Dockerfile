@@ -1,5 +1,9 @@
 FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
+# ISSUE-15: Alpine 3.24 ships Python 3.14 (the python3 apk package).
+# Keep PYTHON_VERSION in sync with the CI matrix in .github/workflows/pr-gate.yml.
+# The build fails fast if the packaged Python drifts from this version.
+
 LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.description="A minimal HTTP proxy routed through Tor" \
       org.opencontainers.image.version="2.0.2" \
@@ -8,6 +12,9 @@ LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.url="https://github.com/hapheus/torproxy"
 
 RUN apk add --no-cache bash ca-certificates curl privoxy tini tor python3 iptables iptables-legacy libcap \
+    && python3 --version \
+    && python3 -c "import sys, sysconfig; print(f'Python {sys.version}'); print(f'Site-packages (purelib): {sysconfig.get_paths()[\"purelib\"]}')" \
+    && python3 -c "import sys; assert sys.version_info[:2] == (3, 14), f'Unexpected Python {sys.version}; expected Python 3.14'" \
     && addgroup -S torproxy \
     && adduser -S -h /var/lib/tor -s /sbin/nologin -G torproxy torproxy \
     && addgroup torproxy privoxy \
@@ -18,16 +25,28 @@ RUN apk add --no-cache bash ca-certificates curl privoxy tini tor python3 iptabl
     && setcap cap_net_admin,cap_net_raw+ep /usr/sbin/xtables-nft-multi \
     && setcap cap_net_admin,cap_net_raw+ep /usr/sbin/xtables-legacy-multi
 
-ENV PYTHONPATH=/usr/lib/python3/dist-packages \
+# ISSUE-15: torproxy is installed into sysconfig's purelib (Alpine: /usr/lib/python3.14/site-packages),
+# which is already on Python's default sys.path, so no PYTHONPATH is needed.
+# The previous /usr/lib/python3/dist-packages path is Debian-specific and does not exist on Alpine.
+ENV PYTHON_VERSION=3.14 \
     TORPROXY_LISTEN_ADDRESS=0.0.0.0 \
     TORPROXY_LISTEN_PORT=8118 \
     TORPROXY_API_PORT=8080 \
     TORPROXY_SOCKS_PORT=9050
 
-COPY src/torproxy /usr/lib/python3/dist-packages/torproxy
+# Stage sources, then install into the sysconfig-derived site-packages so the
+# layout follows the interpreter actually present in the image (ISSUE-15).
+COPY src/torproxy /app/torproxy-src
 # Ship pyproject.toml so torproxy.__version__ resolves from the single source
 # of truth (pyproject.toml) inside the image as well (ISSUE-07).
-COPY pyproject.toml /usr/lib/python3/dist-packages/pyproject.toml
+COPY pyproject.toml /app/pyproject.toml
+RUN SITE_PACKAGES="$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" \
+    && echo "Installing torproxy into $SITE_PACKAGES" \
+    && mkdir -p "$SITE_PACKAGES" \
+    && cp -a /app/torproxy-src "$SITE_PACKAGES/torproxy" \
+    && cp /app/pyproject.toml "$SITE_PACKAGES/pyproject.toml" \
+    && rm -rf /app \
+    && python3 -c "import torproxy; print(f'torproxy {torproxy.__version__} import OK on Python ' + __import__('sys').version)"
 COPY --chmod=755 docker/start.sh /usr/local/bin/start.sh
 COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/healthcheck.sh
 COPY --chmod=644 docker/privoxy.config.template /etc/privoxy/config.template

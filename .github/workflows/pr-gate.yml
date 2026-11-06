@@ -15,6 +15,12 @@ jobs:
   lint-and-validate:
     name: "Lint & Static Analysis"
     runs-on: ubuntu-latest
+    # ISSUE-15: test lint/type-check across the declared minimum (3.10),
+    # the previous CI version (3.11), and the Docker image Python (3.14).
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.14"]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,7 +33,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Verify Lockfile Parity
         run: |
@@ -63,6 +69,11 @@ jobs:
   unit-tests:
     name: "Hermetic Unit Tests"
     runs-on: ubuntu-latest
+    # ISSUE-15: run hermetic tests on 3.10 (minimum), 3.11, and the Docker Python 3.14.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.14"]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,7 +86,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Package & Test Dependencies
         run: |
