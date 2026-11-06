@@ -89,7 +89,18 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ---
 
-## 6. Release Verification Checklist
+## 6. Release Notes
+
+### 2.0.2 (Sprint 1: security & contract fixes)
+
+- **CSRF protection on mutations (ISSUE-01):** `/connect`, `/disconnect`, `/reconnect` presented with a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden`. Requests without those headers (curl, scripts, healthchecks) are unaffected. Wildcard CORS is now sent only on successful non-mutating responses.
+- **`TORPROXY_STRICT_NODES` default fix (ISSUE-04):** setting `TORPROXY_COUNTRY` no longer implicitly enables strict mode; strict requires explicit `TORPROXY_STRICT_NODES=1` (matches the documented default `0`).
+- **Version single source of truth (ISSUE-07):** `torproxy.__version__` is derived from `pyproject.toml`; `torproxy --version` now reports the actual release version.
+- **Repo hygiene (ISSUE-16):** `.mypy_cache/` ignored; contract test guards against tracked compiled artifacts.
+
+---
+
+## 7. Release Verification Checklist
 
 Maintainers must verify the following checklist before publishing any new version:
 - [ ] All hermetic unit tests pass (`uv run pytest tests/unit/ -v --cov=torproxy`).
