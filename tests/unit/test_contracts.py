@@ -255,8 +255,16 @@ class TestEnvironmentAndDefaultsContract:
         # Check exposed ports
         assert re.search(r"EXPOSE\s+.*8118.*8080.*9050", dockerfile)
 
-        # Check non-root user
-        assert re.search(r"USER\s+torproxy", dockerfile)
+        # Check that no daemon runs as the shared torproxy user for the WAN
+        # bypass: the init drops privileges per daemon (ISSUE-03), so the
+        # image must not pin USER torproxy.
+        assert not re.search(r"USER\s+torproxy", dockerfile)
+        start_sh = os.path.join(DOCKER_DIR, "start.sh")
+        with open(start_sh, "r", encoding="utf-8") as f:
+            start_content = f.read()
+        assert "su tor -s" in start_content
+        assert "su privoxy -s" in start_content
+        assert "su torproxy -s" in start_content
 
         # Check healthcheck parameters
         assert "--interval=30s" in dockerfile

@@ -19,10 +19,33 @@ echo "$NAT_RULES" | grep -q "redir ports 9053" || (echo "❌ DNS redirect rule m
 echo "$NAT_RULES" | grep -q "redir ports 9040" || (echo "❌ TransPort redirect rule missing" && exit 1)
 echo "✅ NAT redirection rules verified."
 
+# ISSUE-03: the WAN bypass must be scoped to the dedicated tor user,
+# never to the torproxy UID (API/Privoxy share it).
+TOR_UID=$(docker exec "$GATEWAY_CONTAINER" getent passwd tor | cut -d: -f3)
+TORPROXY_UID=$(docker exec "$GATEWAY_CONTAINER" getent passwd torproxy | cut -d: -f3)
+if echo "$NAT_RULES" | grep -q "owner UID match $TORPROXY_UID"; then
+  echo "❌ CRITICAL: torproxy-UID WAN bypass present in NAT OUTPUT (dedicated tor user missing)!"
+  exit 1
+fi
+echo "$NAT_RULES" | grep -q "owner UID match $TOR_UID" || (echo "❌ Tor-UID bypass rule missing in NAT OUTPUT" && exit 1)
+echo "✅ Tor-UID-scoped NAT bypass verified."
+
 FILTER_RULES=$(docker exec "$GATEWAY_CONTAINER" iptables -L OUTPUT -n)
 echo "$FILTER_RULES"
 echo "$FILTER_RULES" | grep -q "reject-with icmp-port-unreachable" || (echo "❌ Kill switch reject rule missing" && exit 1)
 echo "✅ Filter kill switch verified."
+
+# ISSUE-03: filter-side bypass must also be tor-UID-scoped, and Tor must keep
+# an IPv6 egress exception while the IPv6 policy stays DROP.
+if echo "$FILTER_RULES" | grep -q "owner UID match $TORPROXY_UID"; then
+  echo "❌ CRITICAL: torproxy-UID WAN bypass present in filter OUTPUT (dedicated tor user missing)!"
+  exit 1
+fi
+echo "$FILTER_RULES" | grep -q "owner UID match $TOR_UID" || (echo "❌ Tor-UID bypass rule missing in filter OUTPUT" && exit 1)
+IP6_RULES=$(docker exec "$GATEWAY_CONTAINER" ip6tables -L OUTPUT -n)
+echo "$IP6_RULES"
+echo "$IP6_RULES" | grep -q "owner UID match $TOR_UID" || (echo "❌ Tor-UID IPv6 exception missing" && exit 1)
+echo "✅ IPv6: Tor exception present, policy DROP retained."
 
 # ISSUE-02: an unrestricted ESTABLISHED,RELATED accept would let pre-existing
 # clearnet connections survive a Tor outage and silently break fail-closed.

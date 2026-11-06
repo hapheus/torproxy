@@ -75,7 +75,7 @@ services:
 1. **DNS Leak Prevention**: All DNS queries on port 53 (UDP & TCP) are automatically redirected to Tor's internal resolver. No DNS queries ever touch the Docker host or public DNS resolvers.
 2. **Fail-Closed Kill Switch**: If Tor is bootstrapping, disconnected, or terminates, direct outbound traffic is blocked by `iptables` reject rules.
 3. **UDP Isolation**: Because Tor does not support arbitrary UDP, unsupported outbound UDP is blocked with ICMP port-unreachable to trigger immediate fallback to TCP (e.g. for HTTP/3 / QUIC).
-4. **Non-Root Execution**: `torproxy` continues to run under unprivileged user `torproxy` (UID 102) utilizing Linux file capabilities (`setcap`).
+4. **Non-Root Execution**: The container init runs as root only to drop privileges — every daemon runs as an unprivileged user (`tor`, `privoxy`, `torproxy`). The gateway kill switch scopes the WAN bypass to the dedicated `tor` UID.
 
 ---
 

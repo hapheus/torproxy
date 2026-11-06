@@ -10,10 +10,17 @@ from torproxy.configuration import Settings
 def generate_iptables_rules(
     trans_port: int = 9040,
     dns_port: int = 9053,
-    tor_user: str = "torproxy",
+    tor_user: str = "tor",
     exempt_ports: tuple[int, ...] = (8118, 8080, 9050, 9051),
 ) -> list[list[str]]:
-    """Generate iptables and ip6tables commands for transparent Tor routing and kill switch."""
+    """Generate iptables and ip6tables commands for transparent Tor routing and kill switch.
+
+    ISSUE-03: the WAN bypass (NAT RETURN + filter ACCEPT) applies to the
+    dedicated unprivileged ``tor`` user only. The API, Privoxy, and attached
+    app containers run as other users and get no bypass — netfilter least
+    privilege (see docker/start.sh privilege dropping).
+    """
+    owner_match = ["--uid-owner", tor_user]
     rules: list[list[str]] = []
 
     # 1. NAT Table: Tor process and local daemon ports bypass redirection
@@ -26,8 +33,7 @@ def generate_iptables_rules(
             "OUTPUT",
             "-m",
             "owner",
-            "--uid-owner",
-            tor_user,
+            *owner_match,
             "-j",
             "RETURN",
         ]
@@ -197,8 +203,8 @@ def generate_iptables_rules(
                 "-j",
                 "ACCEPT",
             ],
-            # Tor daemon itself can output to WAN
-            ["iptables", "-A", "OUTPUT", "-m", "owner", "--uid-owner", tor_user, "-j", "ACCEPT"],
+            # Tor daemon itself can output to WAN (dedicated tor user only, ISSUE-03)
+            ["iptables", "-A", "OUTPUT", "-m", "owner", *owner_match, "-j", "ACCEPT"],
             # Kill switch: reject everything else (unsupported UDP, direct TCP leaks)
             ["iptables", "-A", "OUTPUT", "-j", "REJECT", "--reject-with", "icmp-port-unreachable"],
             ["iptables", "-A", "FORWARD", "-j", "DROP"],
@@ -209,7 +215,9 @@ def generate_iptables_rules(
     for p in exempt_ports:
         rules.append(["iptables", "-A", "INPUT", "-p", "tcp", "--dport", str(p), "-j", "ACCEPT"])
 
-    # 3. IPv6 Leak Prevention: Drop all non-loopback IPv6
+    # 3. IPv6 Leak Prevention: Drop all non-loopback IPv6 except Tor itself,
+    # so Tor can still bootstrap in IPv6-only/preferred environments while
+    # every other process stays blocked (ISSUE-03).
     rules.extend(
         [
             ["ip6tables", "-P", "INPUT", "DROP"],
@@ -217,6 +225,7 @@ def generate_iptables_rules(
             ["ip6tables", "-P", "OUTPUT", "DROP"],
             ["ip6tables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"],
             ["ip6tables", "-A", "OUTPUT", "-o", "lo", "-j", "ACCEPT"],
+            ["ip6tables", "-A", "OUTPUT", "-m", "owner", *owner_match, "-j", "ACCEPT"],
         ]
     )
 
@@ -251,7 +260,7 @@ def setup_gateway(settings: Settings) -> None:
     rules = generate_iptables_rules(
         trans_port=settings.trans_port,
         dns_port=settings.dns_port,
-        tor_user="torproxy",
+        tor_user="tor",
         exempt_ports=exempt,
     )
 
