@@ -1,0 +1,18 @@
+services:
+  torproxy:
+    image: hapheus/torproxy:latest
+    cap_add:
+      - NET_ADMIN
+    environment:
+      TORPROXY_GATEWAY_MODE: "true"
+      TORPROXY_COUNTRY: ${TORPROXY_COUNTRY:-}
+    restart: unless-stopped
+
+  client:
+    image: curlimages/curl:latest
+    network_mode: "service:torproxy"
+    depends_on:
+      torproxy:
+        condition: service_healthy
+    command: ["-s", "https://check.torproject.org/api/ip"]
+    restart: "no"

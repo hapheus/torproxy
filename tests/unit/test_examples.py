@@ -211,3 +211,41 @@ class TestMacOSChromeExample:
         assert "## Quick start" in content
         assert "docker compose down" in content
         assert "curl" in content
+
+
+@pytest.mark.unit
+class TestTransparentGatewayExample:
+    """Validate transparent Tor gateway compose and documentation."""
+
+    def test_transparent_gateway_compose_structure(self):
+        compose_path = os.path.join(EXAMPLES_DIR, "transparent-tor-gateway", "docker-compose.yml")
+        assert os.path.exists(compose_path), "Missing transparent-tor-gateway docker-compose.yml"
+        with open(compose_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        assert "services" in data
+        assert "torproxy" in data["services"]
+        assert "client" in data["services"]
+
+        tor_svc = data["services"]["torproxy"]
+        assert tor_svc["image"] == "hapheus/torproxy:latest"
+        assert tor_svc.get("cap_add") == ["NET_ADMIN"]
+        assert tor_svc.get("environment", {}).get("TORPROXY_GATEWAY_MODE") == "true"
+
+        client_svc = data["services"]["client"]
+        assert client_svc.get("network_mode") == "service:torproxy"
+        assert (
+            client_svc.get("depends_on", {}).get("torproxy", {}).get("condition")
+            == "service_healthy"
+        )
+
+    def test_transparent_gateway_readme_documentation(self):
+        readme_path = os.path.join(EXAMPLES_DIR, "transparent-tor-gateway", "README.md")
+        assert os.path.exists(readme_path), "Missing transparent-tor-gateway README.md"
+        with open(readme_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "## Architecture" in content
+        assert "## Prerequisites" in content
+        assert "## Quick Start" in content
+        assert 'network_mode: "service:torproxy"' in content
+        assert "docker compose down" in content

@@ -66,6 +66,9 @@ class Settings:
     api_token: str | None = None
     api_allow_anonymous_health: bool = False
     api_listen_address: str = "0.0.0.0"
+    gateway_mode: bool = False
+    trans_port: int = 9040
+    dns_port: int = 9053
 
     def __post_init__(self) -> None:
         try:
@@ -76,19 +79,26 @@ class Settings:
             ipaddress.IPv4Address(self.api_listen_address)
         except ipaddress.AddressValueError:
             raise ValueError("TORPROXY_API_LISTEN_ADDRESS must be a valid IPv4 address") from None
-        for name, port in (
+        ports_to_check = [
             ("TORPROXY_LISTEN_PORT", self.proxy_port),
             ("TORPROXY_API_PORT", self.api_port),
             ("TORPROXY_SOCKS_PORT", self.socks_port),
             ("TOR_CONTROL_PORT", self.control_port),
-        ):
-            if not 1 <= port <= 65535:
-                raise ValueError(f"{name} must be between 1 and 65535")
-        if len({self.proxy_port, self.api_port, self.socks_port, self.control_port}) != 4:
-            raise ValueError(
-                "Configuration error: TORPROXY_LISTEN_PORT, TORPROXY_API_PORT, TORPROXY_SOCKS_PORT "
-                "and TOR_CONTROL_PORT must all be distinct ports"
+        ]
+        if self.gateway_mode:
+            ports_to_check.extend(
+                [
+                    ("TORPROXY_TRANS_PORT", self.trans_port),
+                    ("TORPROXY_DNS_PORT", self.dns_port),
+                ]
             )
+        for name, p in ports_to_check:
+            if not 1 <= p <= 65535:
+                raise ValueError(f"{name} must be between 1 and 65535")
+        active_ports = {p for _, p in ports_to_check}
+        if len(active_ports) != len(ports_to_check):
+            names = ", ".join(name for name, _ in ports_to_check)
+            raise ValueError(f"Configuration error: {names} must all be distinct ports")
         nodes, country, error = validate_country_input(self.country)
         if error or country != self.country:
             raise ValueError(error or "Country must be normalized")
@@ -124,6 +134,9 @@ class Settings:
 
         api_listen_address = env.get("TORPROXY_API_LISTEN_ADDRESS", "0.0.0.0")
 
+        raw_gw = env.get("TORPROXY_GATEWAY_MODE", "0").strip().lower()
+        gateway_mode = raw_gw in ("1", "true", "yes")
+
         return cls(
             listen_address=env.get("TORPROXY_LISTEN_ADDRESS", "0.0.0.0"),
             proxy_port=port("TORPROXY_LISTEN_PORT", 8118),
@@ -139,6 +152,9 @@ class Settings:
             api_token=api_token,
             api_allow_anonymous_health=api_allow_anonymous_health,
             api_listen_address=api_listen_address,
+            gateway_mode=gateway_mode,
+            trans_port=port("TORPROXY_TRANS_PORT", 9040),
+            dns_port=port("TORPROXY_DNS_PORT", 9053),
         )
 
 
@@ -147,6 +163,9 @@ def render_torrc(settings: Settings, template: str) -> str:
     result = result.replace(
         "ControlPort 127.0.0.1:9051", f"ControlPort 127.0.0.1:{settings.control_port}"
     )
+    if settings.gateway_mode:
+        result += f"\nTransPort 127.0.0.1:{settings.trans_port}\n"
+        result += f"DNSPort 127.0.0.1:{settings.dns_port}\n"
     if settings.exit_nodes:
         result += f"\nExitNodes {settings.exit_nodes}\n"
     if settings.exit_nodes or settings.strict_nodes:

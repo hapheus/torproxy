@@ -12,6 +12,7 @@ Source repository: [https://github.com/hapheus/torproxy](https://github.com/haph
 
 ## Key Features
 
+- **Transparent Tor Gateway**: Route any Docker container's entire TCP and DNS traffic automatically through Tor using `network_mode: "service:torproxy"` — zero app proxy configuration, fail-closed netfilter kill switch.
 - **HTTP/HTTPS Proxy (Port 8118)**: Powered by Privoxy, automatically resolving DNS lookups through Tor exit relays to prevent DNS leaks.
 - **SOCKS5 Proxy (Port 9050)**: Standard Tor SOCKS5 interface supporting remote hostname resolution (`socks5h://`).
 - **REST Control API (Port 8080)**: Inspect circuit status, trigger circuit rotation (`/reconnect`), query health diagnostics, and pull Prometheus metrics.
@@ -63,6 +64,27 @@ docker run -d \
   -p 127.0.0.1:9050:9050 \
   -p 127.0.0.1:8080:8080 \
   hapheus/torproxy:latest
+```
+
+### Option 4: Transparent Tor Gateway (Zero-Config Routing)
+
+```yaml
+services:
+  torproxy:
+    image: hapheus/torproxy:latest
+    cap_add:
+      - NET_ADMIN
+    environment:
+      TORPROXY_GATEWAY_MODE: "true"
+    restart: unless-stopped
+
+  my-app:
+    image: curlimages/curl:latest
+    network_mode: "service:torproxy"
+    depends_on:
+      torproxy:
+        condition: service_healthy
+    command: ["-s", "https://check.torproject.org/api/ip"]
 ```
 
 ---
