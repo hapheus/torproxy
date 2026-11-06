@@ -214,7 +214,12 @@ jobs:
             -p 9051:9050 \
             -p 8081:8080 \
             torproxy:smoke-test)
-          sleep 5
+          # Wait until the API responds (privilege drop + cookie fixup take
+          # a few seconds under the hardened capability profile).
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8081/status >/dev/null 2>&1 && break
+            sleep 2
+          done
           ./tests/integration/verify_container.sh "$HARDENED_ID" 8081 8119 9051
           docker rm -f "$HARDENED_ID"
           echo "✅ Hardened container startup and routing verified."
