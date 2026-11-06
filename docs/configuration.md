@@ -38,6 +38,8 @@ TORPROXY_COUNTRY=DE
 TORPROXY_STRICT_NODES=0
 ```
 
+> **Note:** `TORPROXY_COUNTRY` alone only *prefers* exit nodes in `DE` (`StrictNodes 0`). Strict mode — refusing circuits when no exit node in the country is available — is enabled *only* by an explicit `TORPROXY_STRICT_NODES=1`. It is never implied by `TORPROXY_COUNTRY` or `TORPROXY_EXIT_NODES`.
+
 ### Docker Run CLI Flags
 Pass environment variables directly using the `-e` flag:
 ```sh
