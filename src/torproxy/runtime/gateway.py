@@ -245,8 +245,27 @@ def check_net_admin_capability() -> bool:
     return res.returncode == 0
 
 
+def _rule_exists(cmd: list[str]) -> bool:
+    """Probe whether an append rule is already present (ISSUE-05 idempotency)."""
+    if "-A" not in cmd:
+        return False
+    probe = list(cmd)
+    probe[probe.index("-A")] = "-C"
+    res = subprocess.run(
+        probe,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return res.returncode == 0
+
+
 def setup_gateway(settings: Settings) -> None:
-    """Configure iptables and ip6tables rules if gateway mode is active."""
+    """Configure iptables and ip6tables rules if gateway mode is active.
+
+    Idempotent (ISSUE-05): a second run — e.g. a container restart with
+    rules already present — probes each append rule with ``-C`` and skips
+    existing ones instead of failing on duplicates.
+    """
     if not settings.gateway_mode:
         return
 
@@ -265,6 +284,8 @@ def setup_gateway(settings: Settings) -> None:
     )
 
     for cmd in rules:
+        if _rule_exists(cmd):
+            continue
         subprocess.run(cmd, check=True)
 
 

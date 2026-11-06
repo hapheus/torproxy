@@ -117,3 +117,34 @@ class TestGatewayLifecycle:
         ):
             setup_gateway(settings)
             assert mock_run.call_count > 10
+
+    def test_gateway_second_run_is_noop(self):
+        # ISSUE-05: applying the rules twice (e.g. container restart with
+        # rules already present) must not fail or duplicate rules.
+        from unittest.mock import MagicMock
+
+        settings = Settings(gateway_mode=True, trans_port=9040, dns_port=9053)
+
+        def run_first(cmd, **kwargs):
+            # -C probes report "not exists", -A/-P apply successfully.
+            return MagicMock(returncode=1 if "-C" in cmd else 0)
+
+        with (
+            patch("torproxy.runtime.gateway.check_net_admin_capability", return_value=True),
+            patch("subprocess.run", side_effect=run_first) as mock_first,
+        ):
+            setup_gateway(settings)
+        appended = [c.args[0] for c in mock_first.call_args_list if "-A" in c.args[0]]
+        assert appended, "expected appended rules on first run"
+
+        def run_second(cmd, **kwargs):
+            # -C probes report "already exists".
+            return MagicMock(returncode=0)
+
+        with (
+            patch("torproxy.runtime.gateway.check_net_admin_capability", return_value=True),
+            patch("subprocess.run", side_effect=run_second) as mock_second,
+        ):
+            setup_gateway(settings)
+        reapplied = [c.args[0] for c in mock_second.call_args_list if "-A" in c.args[0]]
+        assert reapplied == [], f"second run must be a no-op, reapplied: {reapplied}"
