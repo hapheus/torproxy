@@ -7,7 +7,7 @@ This document defines the strict, non-negotiable backward compatibility contract
 1. **No Breaking Changes:** Existing Docker configurations, Compose files, deployment scripts, and API consumers must continue working without modifications.
 2. **Additive Evolution:** New features, settings, or telemetry must be introduced additively (e.g., new optional fields or optional environment variables).
 3. **No New Required Secrets or Volumes:** The container must continue to operate out of the box with `docker compose up -d` or `docker run`.
-4. **Dual HTTP Method Support:** Legacy `GET` mutations on `/connect`, `/disconnect`, and `/reconnect` will remain supported indefinitely alongside `POST`.
+4. **Dual HTTP Method Support:** Legacy `GET` mutations on `/connect`, `/disconnect`, and `/reconnect` will remain supported indefinitely alongside `POST`. As a CSRF guard, mutations presented with a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden`; requests without those headers (curl, scripts, healthchecks) are unaffected.
 5. **Stable Defaults:** Port numbers, bind addresses, and environment variable defaults must not change.
 
 ---
@@ -52,7 +52,7 @@ This document defines the strict, non-negotiable backward compatibility contract
 
 Base URL: `http://127.0.0.1:8080` (or `http://torproxy:8080` internally)
 Content-Type: `application/json`
-CORS: `Access-Control-Allow-Origin: *`
+CORS: `Access-Control-Allow-Origin: *` on successful read responses only (never on errors and never on mutations; see §6.2).
 
 ### Endpoints and HTTP Methods
 
@@ -96,6 +96,6 @@ Optional additive fields such as `detail` may be included, but `status` and `ip`
 ## 6. Safe Evolution Rules
 
 1. **Additive Schema:** New JSON response keys can be added, but existing keys must never be removed or change data types.
-2. **Method Deprecation Policy:** While `POST` is recommended for mutating endpoints (`/connect`, `/disconnect`, `/reconnect`), `GET` support is guaranteed indefinitely for backward compatibility.
+2. **Method Deprecation Policy:** While `POST` is recommended for mutating endpoints (`/connect`, `/disconnect`, `/reconnect`), `GET` support is guaranteed indefinitely for backward compatibility. Mutations presented with a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden` (CSRF protection). `Access-Control-Allow-Origin: *` is returned on successful read responses only — never on error responses and never on mutations (nor on mutation preflights).
 3. **No Behavioral Defaults Mutation:** Do not alter default timeouts, ports, or environment variable interpretations.
 4. **Mandatory Test Verification:** Any modification touching the public interface must pass the contract test suite in `tests/unit/test_contracts.py`.

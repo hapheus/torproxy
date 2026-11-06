@@ -21,6 +21,34 @@ class RequestError(Exception):
 class APIHandler(BaseHTTPRequestHandler):
     server: "ProxyHTTPServer"
 
+    MUTATION_PATHS = ("connect", "disconnect", "reconnect")
+    LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+    def _is_same_origin(self) -> bool:
+        """CSRF guard for mutations: browser cross-origin requests carry Origin/Referer.
+
+        Non-browser clients (curl, scripts, Docker healthchecks) send neither
+        header and remain allowed, preserving the legacy GET-mutation contract.
+        """
+        origin = self.headers.get("Origin", "").strip()
+        referer = self.headers.get("Referer", "").strip()
+        candidate = origin or referer
+        if not candidate:
+            return True
+        if candidate == "null":
+            return False
+        host = self.headers.get("Host", "").strip()
+        try:
+            candidate_host = urllib.parse.urlsplit(candidate).hostname
+            request_host = urllib.parse.urlsplit(f"http://{host}").hostname
+        except ValueError:
+            return False
+        if not candidate_host or not request_host:
+            return False
+        if candidate_host == request_host:
+            return True
+        return candidate_host in self.LOOPBACK_HOSTS and request_host in self.LOOPBACK_HOSTS
+
     def setup(self) -> None:
         self.request.settimeout(self.server.settings.request_timeout)
         super().setup()
@@ -88,6 +116,11 @@ class APIHandler(BaseHTTPRequestHandler):
                     401,
                     {"error": "Unauthorized", "detail": "Valid Bearer token or X-API-Key required"},
                 )
+            elif clean_path in self.MUTATION_PATHS and not self._is_same_origin():
+                response = Response(
+                    403,
+                    {"error": "Forbidden", "detail": "Cross-origin mutations are not allowed"},
+                )
             else:
                 params = urllib.parse.parse_qs(parsed.query, max_num_fields=32)
                 country = params.get("country", [None])[0]
@@ -107,7 +140,11 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_response(response.status)
         self.send_header("Content-Type", response.content_type)
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        # Wildcard CORS only on successful, non-mutating responses (ISSUE-01):
+        # never on errors and never on mutations, so foreign origins cannot read
+        # or trigger state changes through a browser.
+        if response.status < 400 and clean_path not in self.MUTATION_PATHS:
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
         if response.status == 401:
@@ -126,8 +163,10 @@ class APIHandler(BaseHTTPRequestHandler):
         self._handle()
 
     def do_OPTIONS(self) -> None:
+        clean_path = urllib.parse.urlsplit(self.path).path.strip("/")
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        if clean_path not in self.MUTATION_PATHS:
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers",

@@ -138,7 +138,7 @@ The lightweight API server on port `8080` manages circuits and monitors health w
 | `/disconnect` | `POST` (or `GET`) | `200` | Pause Tor network traffic (`DisableNetwork=1`). Fails closed. | `{"action":"disconnect","status":"success"}` |
 | `/connect` | `POST` (or `GET`) | `200`, `400` | Resume Tor network traffic (`DisableNetwork=0`). Supports `?country=DE` or JSON body. | `{"action":"connect","status":"success"}` |
 
-> **HTTP Methods:** `POST` is recommended for state mutations (`/reconnect`, `/disconnect`, `/connect`). Legacy `GET` calls remain fully supported for backward compatibility.
+> **HTTP Methods:** `POST` is recommended for state mutations (`/reconnect`, `/disconnect`, `/connect`). Legacy `GET` calls remain fully supported for backward compatibility. Mutations presented with a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden` (CSRF protection); `curl`/script calls without those headers are unaffected.
 > **Authentication (Recommended):** Unauthenticated by default for backward compatibility. Setting `TORPROXY_API_TOKEN` (or `TORPROXY_API_KEY`) protects all endpoints with `Authorization: Bearer <token>` or `X-API-Key: <token>`.
 > Detailed schema definitions are documented in [docs/api.md](docs/api.md).
 
