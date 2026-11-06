@@ -4,6 +4,9 @@ SocksPort 0.0.0.0:__TORPROXY_SOCKS_PORT__
 ControlPort 127.0.0.1:9051
 CookieAuthentication 1
 DataDirectory /var/lib/tor
+# Tor is launched as the dedicated unprivileged 'tor' user by start.sh
+# (ISSUE-03); no User directive needed here since it would require
+# setgroups privilege Tor does not have as a non-root user.
 GeoIPFile /usr/share/tor/geoip
 GeoIPv6File /usr/share/tor/geoip6
 RunAsDaemon 0

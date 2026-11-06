@@ -12,8 +12,8 @@ RUN apk add --no-cache bash ca-certificates curl privoxy tini tor python3 iptabl
     && adduser -S -h /var/lib/tor -s /sbin/nologin -G torproxy torproxy \
     && addgroup torproxy privoxy \
     && install -d -m 0755 -o torproxy -g torproxy /etc/privoxy \
-    && install -d -m 0700 -o torproxy -g torproxy /var/lib/tor \
-    && install -d -o torproxy -g torproxy /var/log/privoxy \
+    && install -d -m 0750 -o tor -g torproxy /var/lib/tor \
+    && install -d -o privoxy -g privoxy /var/log/privoxy \
     && ln -sf /sbin/tini /usr/bin/tini \
     && setcap cap_net_admin,cap_net_raw+ep /usr/sbin/xtables-nft-multi \
     && setcap cap_net_admin,cap_net_raw+ep /usr/sbin/xtables-legacy-multi
@@ -33,7 +33,10 @@ COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/healthcheck.sh
 COPY --chmod=644 docker/privoxy.config.template /etc/privoxy/config.template
 COPY --chmod=644 docker/torrc /etc/tor/torrc
 
-USER torproxy
+# ISSUE-03: the container init runs as root only to drop privileges —
+# start.sh starts every daemon as an unprivileged user (tor, privoxy,
+# torproxy) so the gateway netfilter rules can scope the WAN bypass to
+# the dedicated tor UID. No daemon ever runs as root.
 
 EXPOSE 8118 8080 9050
 

@@ -12,7 +12,7 @@ from torproxy.runtime.gateway import (
 @pytest.mark.unit
 class TestGatewayRules:
     def test_generate_rules_contains_trans_and_dns_ports(self):
-        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="torproxy")
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="tor")
         commands = [" ".join(cmd) for cmd in rules]
 
         # Verify DNS redirect
@@ -27,7 +27,7 @@ class TestGatewayRules:
         assert any("nat -A OUTPUT -p tcp -j REDIRECT --to-ports 9040" in c for c in commands)
 
         # Verify Tor user bypass
-        assert any("nat -A OUTPUT -m owner --uid-owner torproxy -j RETURN" in c for c in commands)
+        assert any("nat -A OUTPUT -m owner --uid-owner tor -j RETURN" in c for c in commands)
 
         # Verify exempt ports in OUTPUT are strictly scoped to loopback 127.0.0.1
         assert any(
@@ -43,11 +43,28 @@ class TestGatewayRules:
         # Verify IPv6 drop
         assert any("ip6tables -P OUTPUT DROP" in c for c in commands)
 
+    def test_dedicated_tor_user_bypass_no_torproxy_bypass(self):
+        # ISSUE-03: only the dedicated unprivileged tor user may bypass NAT /
+        # reach the WAN; API and Privoxy (torproxy user) get no bypass.
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="tor")
+        commands = [" ".join(cmd) for cmd in rules]
+
+        assert any("nat -A OUTPUT -m owner --uid-owner tor -j RETURN" in c for c in commands)
+        assert any("-A OUTPUT -m owner --uid-owner tor -j ACCEPT" in c for c in commands)
+        assert not any("--uid-owner torproxy" in c for c in commands)
+
+    def test_ip6_tor_exception_but_policy_stays_drop(self):
+        # ISSUE-03: Tor itself may bootstrap over IPv6, everyone else stays blocked.
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="tor")
+        commands = [" ".join(cmd) for cmd in rules]
+        assert "ip6tables -P OUTPUT DROP" in commands
+        assert any("ip6tables -A OUTPUT -m owner --uid-owner tor -j ACCEPT" in c for c in commands)
+
     def test_no_unscoped_established_accept(self):
         # ISSUE-02: an unrestricted ESTABLISHED,RELATED ACCEPT in filter OUTPUT
         # lets pre-existing clearnet connections survive a Tor outage and
         # breaks the documented fail-closed guarantee. No such rule may exist.
-        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="torproxy")
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="tor")
         for cmd in rules:
             joined = " ".join(cmd)
             assert "ESTABLISHED" not in joined, f"unscoped ESTABLISHED accept: {joined}"
@@ -56,7 +73,7 @@ class TestGatewayRules:
     def test_kill_switch_reject_is_last_output_rule(self):
         # Legitimate flows stay allowed (loopback, TransPort/DNSPort targets,
         # Tor UID owner) and everything else is rejected last.
-        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="torproxy")
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="tor")
         output_filter = [
             " ".join(cmd)
             for cmd in rules
@@ -65,7 +82,7 @@ class TestGatewayRules:
         assert output_filter, "expected filter OUTPUT rules"
         assert "REJECT" in output_filter[-1]
         assert any("-o lo" in c and "ACCEPT" in c for c in output_filter)
-        assert any("--uid-owner torproxy" in c and "ACCEPT" in c for c in output_filter)
+        assert any("--uid-owner tor" in c and "ACCEPT" in c for c in output_filter)
         assert any("127.0.0.1" in c and "--dport 9040" in c for c in output_filter)
         assert any("127.0.0.1" in c and "--dport 9053" in c for c in output_filter)
 
