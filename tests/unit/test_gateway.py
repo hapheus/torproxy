@@ -29,6 +29,14 @@ class TestGatewayRules:
         # Verify Tor user bypass
         assert any("nat -A OUTPUT -m owner --uid-owner torproxy -j RETURN" in c for c in commands)
 
+        # Verify exempt ports in OUTPUT are strictly scoped to loopback 127.0.0.1
+        assert any(
+            "nat -A OUTPUT -d 127.0.0.1 -p tcp --dport 8080 -j RETURN" in c for c in commands
+        )
+        assert not any(
+            c == "iptables -t nat -A OUTPUT -p tcp --dport 8080 -j RETURN" for c in commands
+        )
+
         # Verify Kill Switch
         assert any("OUTPUT -j REJECT --reject-with icmp-port-unreachable" in c for c in commands)
 

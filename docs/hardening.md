@@ -34,6 +34,10 @@ In standard proxy mode, `torproxy` does not require any Linux capabilities (such
 ### C. Preventing Privilege Escalation (`no-new-privileges:true`)
 Ensures that container processes cannot gain additional privileges via setuid or setgid binaries.
 
+> [!IMPORTANT]
+> **Gateway Mode Incompatibility with `no-new-privileges`:**
+> Do NOT set `security_opt: [no-new-privileges:true]` when running in transparent gateway mode (`TORPROXY_GATEWAY_MODE=true`). The Linux kernel ignores file capabilities (`setcap`) when `no-new-privileges` is set, which prevents the unprivileged `torproxy` user (UID 102) from configuring `iptables`.
+
 ---
 
 ## 3. Production Hardened Docker Compose Configuration

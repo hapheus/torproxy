@@ -40,6 +40,8 @@ def generate_iptables_rules(
                 "nat",
                 "-A",
                 "OUTPUT",
+                "-d",
+                "127.0.0.1",
                 "-p",
                 "tcp",
                 "--dport",
