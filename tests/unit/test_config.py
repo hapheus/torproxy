@@ -205,11 +205,27 @@ class TestTorrcGeneration:
     def test_single_country_code(self, tmp_path):
         content = self._render_torrc({"TORPROXY_COUNTRY": "DE"}, tmp_path)
         assert "ExitNodes {de}" in content
-        assert "StrictNodes 1" in content
+        assert "StrictNodes 0" in content
 
     def test_multi_country_code_case_insensitive(self, tmp_path):
         content = self._render_torrc({"TORPROXY_COUNTRY": "de, AT, us"}, tmp_path)
         assert "ExitNodes {de},{at},{us}" in content
+        assert "StrictNodes 0" in content
+
+    def test_country_without_strict_defaults_to_not_strict(self, tmp_path):
+        # ISSUE-04: TORPROXY_COUNTRY alone must not implicitly enable strict mode.
+        content = self._render_torrc({"TORPROXY_COUNTRY": "DE"}, tmp_path)
+        assert "StrictNodes 0" in content
+
+    def test_exit_nodes_without_strict_defaults_to_not_strict(self, tmp_path):
+        content = self._render_torrc({"TORPROXY_EXIT_NODES": "{ch},{nl}"}, tmp_path)
+        assert "StrictNodes 0" in content
+
+    def test_country_with_explicit_strict_enabled(self, tmp_path):
+        content = self._render_torrc(
+            {"TORPROXY_COUNTRY": "DE", "TORPROXY_STRICT_NODES": "1"}, tmp_path
+        )
+        assert "ExitNodes {de}" in content
         assert "StrictNodes 1" in content
 
     def test_country_with_strict_nodes_disabled(self, tmp_path):
@@ -222,7 +238,7 @@ class TestTorrcGeneration:
     def test_direct_exit_nodes_override(self, tmp_path):
         content = self._render_torrc({"TORPROXY_EXIT_NODES": "{ch},{nl}"}, tmp_path)
         assert "ExitNodes {ch},{nl}" in content
-        assert "StrictNodes 1" in content
+        assert "StrictNodes 0" in content
 
 
 @pytest.mark.unit

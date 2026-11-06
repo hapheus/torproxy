@@ -146,9 +146,10 @@ class Settings:
             cookie_path=env.get("TOR_CONTROL_COOKIE_FILE", "/var/lib/tor/control_auth_cookie"),
             country=country,
             exit_nodes=nodes or env.get("TORPROXY_EXIT_NODES", ""),
-            strict_nodes=strict
-            if strict is not None
-            else bool(nodes or env.get("TORPROXY_EXIT_NODES")),
+            # ISSUE-04: strict mode is only enabled by an explicit
+            # TORPROXY_STRICT_NODES=1. Setting a country/exit nodes alone
+            # must never implicitly refuse circuits (documented default 0).
+            strict_nodes=strict if strict is not None else False,
             api_token=api_token,
             api_allow_anonymous_health=api_allow_anonymous_health,
             api_listen_address=api_listen_address,
