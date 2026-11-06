@@ -24,16 +24,17 @@ su tor -s /bin/sh -c 'exec tor -f /tmp/torrc' &
 tor_pid=$!
 
 # Tor (running as 'tor') creates a 0600 control cookie; make it
-# group-readable for the API, which runs as 'torproxy'.
+# group-readable for the API, which runs as 'torproxy'. The fixups run
+# as 'tor' (the file owner) so they also work under cap-drop hardening.
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   [ -f /var/lib/tor/control_auth_cookie ] && break
   sleep 1
 done
 # Tor locks its DataDirectory to 0700 at startup; restore group traverse
 # so the API (group torproxy) can read the cookie file.
-chmod 0750 /var/lib/tor 2>/dev/null || true
-chgrp torproxy /var/lib/tor/control_auth_cookie 2>/dev/null || true
-chmod 640 /var/lib/tor/control_auth_cookie 2>/dev/null || true
+su tor -s /bin/sh -c 'chgrp torproxy /var/lib/tor/control_auth_cookie' 2>/dev/null || true
+su tor -s /bin/sh -c 'chmod 640 /var/lib/tor/control_auth_cookie' 2>/dev/null || true
+su tor -s /bin/sh -c 'chmod 0750 /var/lib/tor' 2>/dev/null || true
 
 su privoxy -s /bin/sh -c 'exec privoxy --no-daemon /tmp/privoxy.config' &
 privoxy_pid=$!

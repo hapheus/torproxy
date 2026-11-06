@@ -11,6 +11,7 @@ RUN apk add --no-cache bash ca-certificates curl privoxy tini tor python3 iptabl
     && addgroup -S torproxy \
     && adduser -S -h /var/lib/tor -s /sbin/nologin -G torproxy torproxy \
     && addgroup torproxy privoxy \
+    && addgroup tor torproxy \
     && install -d -m 0755 -o torproxy -g torproxy /etc/privoxy \
     && install -d -m 0750 -o tor -g torproxy /var/lib/tor \
     && install -d -o privoxy -g privoxy /var/log/privoxy \

@@ -208,6 +208,8 @@ jobs:
             --name torproxy-hardened-test \
             --security-opt no-new-privileges:true \
             --cap-drop ALL \
+            --cap-add SETUID \
+            --cap-add SETGID \
             -p 8119:8118 \
             -p 9051:9050 \
             -p 8081:8080 \
