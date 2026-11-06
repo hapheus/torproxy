@@ -176,6 +176,33 @@ def generate_iptables_rules(
                 "ACCEPT",
             ],
             ["iptables", "-A", "OUTPUT", "-o", "lo", "-j", "ACCEPT"],
+            # Accept redirected traffic arriving at loopback
+            [
+                "iptables",
+                "-A",
+                "OUTPUT",
+                "-d",
+                "127.0.0.1",
+                "-p",
+                "udp",
+                "--dport",
+                str(dns_port),
+                "-j",
+                "ACCEPT",
+            ],
+            [
+                "iptables",
+                "-A",
+                "OUTPUT",
+                "-d",
+                "127.0.0.1",
+                "-p",
+                "tcp",
+                "--dport",
+                str(trans_port),
+                "-j",
+                "ACCEPT",
+            ],
             # Tor daemon itself can output to WAN
             ["iptables", "-A", "OUTPUT", "-m", "owner", "--uid-owner", tor_user, "-j", "ACCEPT"],
             # Kill switch: reject everything else (unsupported UDP, direct TCP leaks)
