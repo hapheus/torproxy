@@ -43,6 +43,32 @@ class TestGatewayRules:
         # Verify IPv6 drop
         assert any("ip6tables -P OUTPUT DROP" in c for c in commands)
 
+    def test_no_unscoped_established_accept(self):
+        # ISSUE-02: an unrestricted ESTABLISHED,RELATED ACCEPT in filter OUTPUT
+        # lets pre-existing clearnet connections survive a Tor outage and
+        # breaks the documented fail-closed guarantee. No such rule may exist.
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="torproxy")
+        for cmd in rules:
+            joined = " ".join(cmd)
+            assert "ESTABLISHED" not in joined, f"unscoped ESTABLISHED accept: {joined}"
+            assert "RELATED" not in joined, f"unscoped RELATED accept: {joined}"
+
+    def test_kill_switch_reject_is_last_output_rule(self):
+        # Legitimate flows stay allowed (loopback, TransPort/DNSPort targets,
+        # Tor UID owner) and everything else is rejected last.
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="torproxy")
+        output_filter = [
+            " ".join(cmd)
+            for cmd in rules
+            if cmd[0] == "iptables" and len(cmd) > 2 and cmd[1] == "-A" and cmd[2] == "OUTPUT"
+        ]
+        assert output_filter, "expected filter OUTPUT rules"
+        assert "REJECT" in output_filter[-1]
+        assert any("-o lo" in c and "ACCEPT" in c for c in output_filter)
+        assert any("--uid-owner torproxy" in c and "ACCEPT" in c for c in output_filter)
+        assert any("127.0.0.1" in c and "--dport 9040" in c for c in output_filter)
+        assert any("127.0.0.1" in c and "--dport 9053" in c for c in output_filter)
+
     def test_custom_ports_in_rules(self):
         rules = generate_iptables_rules(trans_port=9045, dns_port=9055, tor_user="customuser")
         commands = [" ".join(cmd) for cmd in rules]

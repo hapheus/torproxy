@@ -24,6 +24,14 @@ echo "$FILTER_RULES"
 echo "$FILTER_RULES" | grep -q "reject-with icmp-port-unreachable" || (echo "❌ Kill switch reject rule missing" && exit 1)
 echo "✅ Filter kill switch verified."
 
+# ISSUE-02: an unrestricted ESTABLISHED,RELATED accept would let pre-existing
+# clearnet connections survive a Tor outage and silently break fail-closed.
+if echo "$FILTER_RULES" | grep -q "RELATED,ESTABLISHED"; then
+  echo "❌ CRITICAL: unrestricted ESTABLISHED,RELATED accept present in filter OUTPUT (fail-closed bypass)!"
+  exit 1
+fi
+echo "✅ No ESTABLISHED fail-closed bypass rule present."
+
 echo "=== 2. Transparent Tor Egress Verification ==="
 CLIENT_OUTPUT=$(docker run --rm --network "container:${GATEWAY_CONTAINER}" curlimages/curl:latest -sS --connect-timeout 15 --max-time 30 https://check.torproject.org/api/ip)
 echo "Client Response: $CLIENT_OUTPUT"

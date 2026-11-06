@@ -162,19 +162,13 @@ def generate_iptables_rules(
     )
 
     # 2. Filter Table: Fail-Closed Kill Switch & Non-Tor UDP drop
+    # NOTE (ISSUE-02): there is intentionally no ESTABLISHED,RELATED accept.
+    # An unrestricted conntrack accept would let pre-existing clearnet
+    # connections (established before Tor bootstrapped or after a Tor outage)
+    # survive and silently bypass fail-closed. Legitimate flows are covered
+    # by the loopback, TransPort/DNSPort, and Tor-UID-owner rules below.
     rules.extend(
         [
-            [
-                "iptables",
-                "-A",
-                "OUTPUT",
-                "-m",
-                "conntrack",
-                "--ctstate",
-                "ESTABLISHED,RELATED",
-                "-j",
-                "ACCEPT",
-            ],
             ["iptables", "-A", "OUTPUT", "-o", "lo", "-j", "ACCEPT"],
             # Accept redirected traffic arriving at loopback
             [
