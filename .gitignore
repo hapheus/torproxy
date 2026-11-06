@@ -32,6 +32,7 @@ env/
 
 # Testing & Linting (ADR-004 & ADR-005)
 .pytest_cache/
+.mypy_cache/
 .ruff_cache/
 .coverage
 coverage.xml
