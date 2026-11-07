@@ -37,6 +37,7 @@ jobs:
           image_ref: "torproxy:smoke-test"
           build_local: "true"
           run_alerts: "false"
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   github-release:
     name: "Generate Changelog & Publish GitHub Release"

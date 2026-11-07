@@ -44,3 +44,4 @@ jobs:
           image_ref: "hapheus/torproxy:${{ github.event.inputs.image_tag || 'latest' }}"
           build_local: "false"
           run_alerts: "true"
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}

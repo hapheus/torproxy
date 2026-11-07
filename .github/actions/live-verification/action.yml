@@ -12,6 +12,10 @@ inputs:
     description: "Create/close canary-alert issues on failure/success ('true'/'false', daily canary only)"
     required: false
     default: "false"
+  dockerhub_token:
+    description: "Docker Hub token for rate-limit prevention (composite actions cannot access the secrets context)"
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -20,38 +24,40 @@ runs:
     # -------------------------------------------------------------
     - name: Determine Host IP
       id: host-info
+      shell: bash
       run: |
         RUNNER_IP=$(curl -s --connect-timeout 10 --max-time 15 https://api.ipify.org || curl -s --connect-timeout 10 --max-time 15 https://icanhazip.com)
         echo "Host Runner IP: $RUNNER_IP"
         echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
 
     - name: Log in to Docker Hub (Rate Limit Prevention)
-      if: env.DOCKERHUB_TOKEN != ''
+      if: inputs.dockerhub_token != ''
       uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
       with:
         registry: docker.io
         username: hapheus
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-      env:
-        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        password: ${{ inputs.dockerhub_token }}
 
     # -------------------------------------------------------------
     # 2. Build the image from source or pull the published image
     # -------------------------------------------------------------
     - name: Build Image From Source
       if: inputs.build_local == 'true'
+      shell: bash
       run: |
         echo "Building Docker Image: ${{ inputs.image_ref }}..."
         docker build -f docker/Dockerfile -t "${{ inputs.image_ref }}" .
 
     - name: Pull Published Image
       if: inputs.build_local != 'true'
+      shell: bash
       run: |
         echo "Pulling Docker Image: ${{ inputs.image_ref }}..."
         docker pull "${{ inputs.image_ref }}"
 
     - name: Start torproxy Container
       id: run-container
+      shell: bash
       run: |
         echo "Starting Container..."
         CONTAINER_ID=$(docker run -d \
@@ -66,7 +72,7 @@ runs:
     # 3. Live verification: wait for 100% Tor bootstrap (SLA: max 180s)
     # -------------------------------------------------------------
     - name: Wait for Tor 100% Bootstrap
-      timeout-minutes: 4
+      shell: bash
       run: |
         echo "Waiting for Tor Bootstrap via REST API (http://localhost:8080/status)..."
         BOOTSTRAPPED=false
@@ -96,6 +102,7 @@ runs:
     # 4. HTTP proxy (Privoxy :8118) egress and anonymity check
     # -------------------------------------------------------------
     - name: Verify HTTP Proxy (Port 8118) Egress & Anonymity
+      shell: bash
       run: |
         RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
         echo "Testing Privoxy HTTP Proxy via http://127.0.0.1:8118..."
@@ -153,6 +160,7 @@ runs:
     # 5. SOCKS5 proxy (Tor :9050) egress and remote DNS check
     # -------------------------------------------------------------
     - name: Verify SOCKS5 Proxy (Port 9050) Egress & DNS Resolution
+      shell: bash
       run: |
         RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
         echo "Testing Tor SOCKS5 Proxy via socks5h://127.0.0.1:9050 (Remote DNS)..."
@@ -209,6 +217,7 @@ runs:
     # 6. Circuit rotation (/reconnect -> SIGNAL NEWNYM)
     # -------------------------------------------------------------
     - name: Verify Circuit Rotation (/reconnect -> SIGNAL NEWNYM)
+      shell: bash
       run: |
         OLD_IP="${{ env.initial_http_ip }}"
         echo "Current Exit IP before rotation: $OLD_IP"
@@ -270,6 +279,7 @@ runs:
     # 6b. Transparent Tor Gateway Mode verification
     # -------------------------------------------------------------
     - name: Verify Transparent Tor Gateway Mode
+      shell: bash
       run: |
         echo "Starting torproxy in Gateway Mode..."
         docker run -d \
@@ -304,6 +314,7 @@ runs:
     # 6c. GeoIP upstream drift guard + auto-update verification
     # -------------------------------------------------------------
     - name: Verify GeoIP Upstream Size Drift Guard
+      shell: bash
       run: |
         # ISSUE-117: fail fast when an upstream GeoIP file outgrows
         # its configured size limit (deterministic, no Tor needed).
@@ -328,6 +339,7 @@ runs:
         echo "✅ GeoIP upstream sizes fit the configured limits"
 
     - name: Verify GeoIP Database Availability & Auto-Update
+      shell: bash
       run: |
         echo "Checking upstream GeoIP URLs are reachable..."
         GEOIP_URL="https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip"
@@ -388,6 +400,7 @@ runs:
     # -------------------------------------------------------------
     - name: Generate Step Summary
       if: always()
+      shell: bash
       run: |
         echo "### 🛡️ Live Image Verification Summary" >> "$GITHUB_STEP_SUMMARY"
         echo "- **Image:** \`${{ inputs.image_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
@@ -401,6 +414,7 @@ runs:
 
     - name: Dump Container Logs on Failure
       if: failure()
+      shell: bash
       run: |
         echo "=== torproxy-canary Docker Logs ==="
         docker logs torproxy-canary || true
@@ -412,6 +426,7 @@ runs:
     # -------------------------------------------------------------
     - name: Cleanup Container
       if: always()
+      shell: bash
       run: |
         echo "Stopping and cleaning up container..."
         docker stop torproxy-canary torproxy-canary-gateway torproxy-canary-geoip || true

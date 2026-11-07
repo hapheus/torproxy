@@ -61,6 +61,18 @@ def test_live_verification_is_a_composite_action() -> None:
     assert "geoip6_max_bytes" in live
 
 
+def test_composite_action_respects_composite_constraints() -> None:
+    # Composite actions require shell: bash on run steps, cannot use
+    # the secrets context (token must be passed as an input) and do
+    # not support timeout-minutes on steps.
+    live = (
+        WORKFLOWS.parents[1] / ".github" / "actions" / "live-verification" / "action.yml"
+    ).read_text(encoding="utf-8")
+    assert "secrets." not in live
+    assert "timeout-minutes" not in live
+    assert live.count("run: |") == live.count("shell: bash")
+
+
 def test_pr_gate_runs_live_verification_before_merge() -> None:
     pr_gate = _read("pr-gate.yml")
     assert "live-image-verification" in pr_gate
