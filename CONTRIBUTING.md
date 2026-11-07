@@ -63,6 +63,34 @@ test: add hermetic unit tests for tor control protocol parser
 docs: clarify remote DNS resolution via socks5h in README
 ```
 
+> [!IMPORTANT]
+> Commit messages that follow Conventional Commits are parsed by `git-cliff`
+> (configured in `cliff.toml`). Maintainers use this configuration to generate
+> and update `CHANGELOG.md` during release preparation. The
+> `.github/workflows/release.yml` workflow independently generates the GitHub
+> Release notes when a version tag is pushed. Future commits should adhere to
+> Conventional Commits formatting, while legacy commits are categorized using
+> explicit rules and a fallback "Other" category to prevent omitted changes.
+
+---
+
+## Changelog
+
+`CHANGELOG.md` is maintained following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+format and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Entries are derived
+from [Conventional Commits](https://www.conventionalcommits.org/) via `git-cliff`
+(configured in `cliff.toml`).
+
+Maintainers performing a release should:
+
+1. Bump the version in `pyproject.toml` (`torproxy.__version__` is derived from it, so it needs no separate edit).
+2. Update `uv.lock` (`uv lock`).
+3. Sync the version label in `docker/Dockerfile` (`org.opencontainers.image.version`).
+4. Update `docs/releases.md` with release notes.
+5. Update `CHANGELOG.md` for the new version (using `git-cliff` or `scripts/prepend_changelog_section.py`, which also maintains the comparison links) within the release PR.
+6. Merge the release PR to `main` and push the `vX.Y.Z` tag.
+7. The `.github/workflows/release.yml` workflow automatically publishes the GitHub Release with the generated changelog notes, while `.github/workflows/publish-dockerhub.yml` builds and publishes the multi-architecture container images.
+
 ---
 
 ## Pull Request Checklist

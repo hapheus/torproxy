@@ -60,6 +60,41 @@ jobs:
           shellcheck tests/integration/verify_container.sh
           shellcheck tests/integration/verify_gateway.sh
 
+      - name: Validate CHANGELOG.md structure
+        run: |
+          python3 - <<'EOF'
+          import re, sys
+
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+
+          # Must have standard Keep a Changelog header elements
+          assert "# Changelog" in text, "Missing top-level heading in CHANGELOG.md"
+          assert "Keep a Changelog" in text, "Missing Keep a Changelog reference in CHANGELOG.md"
+          assert "Semantic Versioning" in text, "Missing SemVer reference in CHANGELOG.md"
+
+          # Every version section must carry an ISO-8601 date or be [Unreleased]
+          sections = re.findall(r"^## \[(.+?)\]", text, re.MULTILINE)
+          if not sections:
+              print("ERROR: No version sections found in CHANGELOG.md", file=sys.stderr)
+              sys.exit(1)
+
+          dated = re.findall(r"^## \[(?!Unreleased).+?\] .+ \d{4}-\d{2}-\d{2}", text, re.MULTILINE)
+          versioned = [s for s in sections if s != "Unreleased"]
+          if len(dated) != len(versioned):
+              print(f"ERROR: {len(versioned)} versioned sections but only {len(dated)} have ISO-8601 dates",
+                    file=sys.stderr)
+              sys.exit(1)
+
+          # Comparison links must be present for all sections
+          if "Unreleased" in sections:
+              assert "[Unreleased]:" in text, "Missing comparison link for [Unreleased]"
+
+          for v in versioned:
+              assert f"[{v}]:" in text, f"Missing comparison link for [{v}]"
+
+          print(f"CHANGELOG.md OK — {len(sections)} sections ({len(versioned)} versioned, comparison links present)")
+          EOF
+
   unit-tests:
     name: "Hermetic Unit Tests"
     runs-on: ubuntu-latest
