@@ -11,6 +11,37 @@ import urllib.request
 from torproxy.models import CommandResult
 
 
+def _classify_transport_error(exc: BaseException) -> str:
+    """Map a transport failure to a stable, leak-free reason (ISSUE-12).
+
+    Distinct causes must not collapse into one string, otherwise a dead
+    local HTTP proxy (Privoxy, 8118) looks identical to a dead check
+    service although SOCKS5/Tor may be healthy:
+
+    - connection refused to the local proxy -> local HTTP proxy
+    - HTTP error answered by the local proxy (e.g. 5xx from Privoxy
+      because the Tor circuit is not ready) -> Tor upstream failure
+    - anything else (timeout, DNS, remote reset) -> check service
+
+    Raw socket text is never included (cf. ISSUE-08).
+    """
+    # HTTPError is a subclass of URLError and must be checked first:
+    # it proves some HTTP server answered. A 5xx from the local
+    # proxy (Privoxy) means the Tor upstream failed; a 4xx proves
+    # the check service itself answered through a healthy proxy
+    # (e.g. 429 rate-limit) and must not be blamed on Tor.
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code >= 500:
+            return f"Tor upstream unavailable via local HTTP proxy (HTTP {exc.code})"
+        return f"egress check service returned HTTP {exc.code}"
+    reason = getattr(exc, "reason", exc)
+    if isinstance(reason, ConnectionRefusedError) or isinstance(exc, ConnectionRefusedError):
+        return "local HTTP proxy unreachable"
+    if isinstance(reason, str) and "connection refused" in reason.lower():
+        return "local HTTP proxy unreachable"
+    return "egress check service unreachable"
+
+
 class TorEgressProbe:
     """Egress probe with retry, backoff and circuit breaker (ISSUE-06).
 
@@ -20,6 +51,10 @@ class TorEgressProbe:
     exponential backoff, trips a short circuit breaker after repeated
     failures and returns distinct, operator-safe reasons so callers can
     report "degraded (check service unreachable)" instead of "connecting".
+
+    ISSUE-12 (#76) further distinguishes a dead local HTTP proxy and a
+    Tor upstream failure (proxy 5xx) from an unreachable check service;
+    see `_classify_transport_error`.
     """
 
     PRIMARY_URL = "https://check.torproject.org/api/ip"
@@ -40,6 +75,7 @@ class TorEgressProbe:
         self._lock = threading.Lock()
         self._failures = 0
         self._open_until = 0.0
+        self._last_error: str | None = None
 
     def _circuit_open(self) -> bool:
         with self._lock:
@@ -68,8 +104,8 @@ class TorEgressProbe:
                 raw = response.read(16385)
             finally:
                 response.close()
-        except (OSError, urllib.error.URLError, TimeoutError):
-            return None, "egress check service unreachable", False
+        except (OSError, urllib.error.URLError, TimeoutError) as exc:
+            return None, _classify_transport_error(exc), False
         if len(raw) > 16384:
             return None, "Tor check response too large", True
         try:
@@ -97,14 +133,20 @@ class TorEgressProbe:
 
     def resolve(self) -> CommandResult:
         if self._circuit_open():
-            return None, "egress check service unreachable (circuit breaker open)"
+            # Keep the original cause (ISSUE-12): an open breaker
+            # after repeated local-proxy refusals must not revert
+            # to blaming the check service.
+            cause = self._last_error or "egress check service unreachable"
+            return None, f"{cause} (circuit breaker open)"
         last_error: str | None = None
         for attempt in range(self.max_retries + 1):
             ip, error, reachable = self._attempt()
             if ip:
                 self._note_success()
+                self._last_error = None
                 return ip, None
             last_error = error
+            self._last_error = error
             if reachable:
                 # The service answered: no retry helps (IsTor=false etc.).
                 self._note_failure()
