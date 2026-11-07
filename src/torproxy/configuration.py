@@ -84,14 +84,16 @@ class Settings:
     socks_allowed_cidrs: str = ""
 
     def __post_init__(self) -> None:
+        # ISSUE-18b (#107): IPv4 and IPv6 listen addresses are
+        # both valid; defaults are unchanged (0.0.0.0).
         try:
-            ipaddress.IPv4Address(self.listen_address)
-        except ipaddress.AddressValueError:
-            raise ValueError("TORPROXY_LISTEN_ADDRESS must be a valid IPv4 address") from None
+            ipaddress.ip_address(self.listen_address)
+        except ValueError:
+            raise ValueError("TORPROXY_LISTEN_ADDRESS must be a valid IP address") from None
         try:
-            ipaddress.IPv4Address(self.api_listen_address)
-        except ipaddress.AddressValueError:
-            raise ValueError("TORPROXY_API_LISTEN_ADDRESS must be a valid IPv4 address") from None
+            ipaddress.ip_address(self.api_listen_address)
+        except ValueError:
+            raise ValueError("TORPROXY_API_LISTEN_ADDRESS must be a valid IP address") from None
         ports_to_check = [
             ("TORPROXY_LISTEN_PORT", self.proxy_port),
             ("TORPROXY_API_PORT", self.api_port),

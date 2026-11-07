@@ -36,7 +36,7 @@ This document defines the strict, non-negotiable backward compatibility contract
 
 | Variable | Default Value | Format / Validation | Guaranteed Behavior |
 |---|---|---|---|
-| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Valid IPv4 address | Bind address for Privoxy inside the container. |
+| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Valid IP address (IPv4 or IPv6) | Bind address for Privoxy inside the container. |
 | `TORPROXY_LISTEN_PORT` | `8118` | Integer `1`–`65535` | Listening port for Privoxy inside the container. |
 | `TORPROXY_API_PORT` | `8080` | Integer `1`–`65535` | Listening port for the Python REST API server. |
 | `TORPROXY_SOCKS_PORT` | `9050` | Integer `1`–`65535` | Listening port for Tor SOCKS5 inside the container. |
