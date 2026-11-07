@@ -46,6 +46,7 @@ This document defines the strict, non-negotiable backward compatibility contract
 | `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | Boolean (`0`, `1`, `true`, `false`, `yes`, `no`) | Optional additive: Periodically download Tor GeoIP DB from Tor Project GitLab. Default: `0` (bundled DB, unchanged behavior). |
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API (8080). Default: unset (unauthenticated). |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Permits unauthenticated `/health` probe access when token auth is enabled. |
+| `TORPROXY_SOCKS_ALLOWED_CIDRS` | *(unset)* | Comma-separated CIDRs | Optional: Restricts SOCKS port access by source CIDR (Tor `SocksPolicy`). Default unset = accept all (legacy behavior). |
 
 ---
 
