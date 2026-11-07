@@ -9,6 +9,7 @@ import pytest
 
 from torproxy.configuration import Settings, render_torrc
 from torproxy.runtime.geoip import (
+    _https_fetch,
     _sighup_tor,
     has_valid_geoip,
     main,
@@ -29,6 +30,34 @@ def _fetcher(pages: dict[str, bytes] | None = None, error: Exception | None = No
         return pages[url]
 
     return fetch
+
+
+class TestGeoipUserAgent:
+    def test_fetch_uses_default_urllib_user_agent(self, monkeypatch):
+        # ISSUE-20 regression (#113): GitLab serves raw files only
+        # to known User-Agent patterns (curl/*, Python-urllib/*,
+        # browsers). A custom "torproxy-geoip/1" UA gets HTTP 403,
+        # so the downloader must not set a custom User-Agent.
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, n):
+                return GEOIP_V4
+
+        def fake_urlopen(request, timeout=None):
+            captured["ua"] = request.get_header("User-agent")
+            return FakeResponse()
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        data = _https_fetch("https://gitlab.torproject.org/x/geoip", 1024)
+        assert data == GEOIP_V4
+        assert captured["ua"] is None  # urllib default (Python-urllib/*)
 
 
 class TestGeoipSettings:
