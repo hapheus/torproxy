@@ -9,14 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-11-06
+
+Sprint 2 gateway security architecture release.
+
 ### Fixed
-- **gateway**: Scope WAN bypass to dedicated tor user via privilege-dropping init
-- **gateway**: Remove unrestricted ESTABLISHED accept from kill switch
+- **gateway**: Remove unrestricted ESTABLISHED accept from kill switch (ISSUE-02, #89)
+- **gateway**: Scope WAN bypass to dedicated tor user via privilege-dropping init (ISSUE-03, #91)
+- **gateway**: Make setup_gateway idempotent via -C probes (ISSUE-05, #92)
 
 ### CI
 - **gateway**: Wait for API in hardened smoke step before verifying
 - **gateway**: Allow SETUID/SETGID in hardened test and fix cookie perms under cap-drop
 - **gateway**: Verify unprivileged daemons instead of container UID
+
+### Chore
+- **release**: Bump version to 2.1.0 and add Sprint 2 release notes (#94)
 
 ## [2.0.2] — 2026-11-06
 
@@ -168,7 +176,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/hapheus/torproxy/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/hapheus/torproxy/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/hapheus/torproxy/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/hapheus/torproxy/compare/v1.7.1...v2.0.0

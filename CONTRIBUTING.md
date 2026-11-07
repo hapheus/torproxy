@@ -83,12 +83,13 @@ from [Conventional Commits](https://www.conventionalcommits.org/) via `git-cliff
 
 Maintainers performing a release should:
 
-1. Bump the version in `pyproject.toml`.
+1. Bump the version in `pyproject.toml` (`torproxy.__version__` is derived from it, so it needs no separate edit).
 2. Update `uv.lock` (`uv lock`).
-3. Update `docs/releases.md` with release notes.
-4. Update `CHANGELOG.md` for the new version (using `git-cliff` or `scripts/prepend_changelog_section.py`) within the release PR.
-5. Merge the release PR to `main` and push the `vX.Y.Z` tag.
-6. The `.github/workflows/release.yml` workflow automatically publishes the GitHub Release with the generated changelog notes, while `.github/workflows/publish-dockerhub.yml` builds and publishes the multi-architecture container images.
+3. Sync the version label in `docker/Dockerfile` (`org.opencontainers.image.version`).
+4. Update `docs/releases.md` with release notes.
+5. Update `CHANGELOG.md` for the new version (using `git-cliff` or `scripts/prepend_changelog_section.py`, which also maintains the comparison links) within the release PR.
+6. Merge the release PR to `main` and push the `vX.Y.Z` tag.
+7. The `.github/workflows/release.yml` workflow automatically publishes the GitHub Release with the generated changelog notes, while `.github/workflows/publish-dockerhub.yml` builds and publishes the multi-architecture container images.
 
 ---
 
