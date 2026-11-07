@@ -49,7 +49,12 @@ def validate_geoip_content(data: bytes, ipv6: bool) -> bool:
 def _https_fetch(url: str, max_bytes: int) -> bytes:
     if not url.startswith("https://"):
         raise ValueError("GeoIP URL must use https://")
-    request = urllib.request.Request(url, headers={"User-Agent": "torproxy-geoip/1"})
+    # ISSUE-20 regression (#113): GitLab only serves raw files to
+    # known User-Agent patterns (curl/*, Python-urllib/*, browsers);
+    # a custom UA such as "torproxy-geoip/1" is answered with
+    # HTTP 403. Deliberately send no custom User-Agent and rely
+    # on urllib's default (Python-urllib/*).
+    request = urllib.request.Request(url)
     with urllib.request.urlopen(request, timeout=30) as response:
         data = response.read(max_bytes + 1)
     if len(data) > max_bytes:
