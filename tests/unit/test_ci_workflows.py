@@ -73,6 +73,18 @@ def test_composite_action_respects_composite_constraints() -> None:
     assert live.count("run: |") == live.count("shell: bash")
 
 
+def test_gateway_bootstrap_is_polled_inside_the_container_in_live_action() -> None:
+    # ISSUE-19 regression (PR #118): polling the gateway container
+    # via its published host port goes through the kill switch and
+    # never returns "connected" — the step burned ~9 minutes although
+    # Tor bootstrapped in seconds. Poll over loopback in-container.
+    live = (
+        WORKFLOWS.parents[1] / ".github" / "actions" / "live-verification" / "action.yml"
+    ).read_text(encoding="utf-8")
+    assert "docker exec torproxy-canary-gateway curl" in live
+    assert "http://localhost:8089/status" not in live
+
+
 def test_pr_gate_runs_live_verification_before_merge() -> None:
     pr_gate = _read("pr-gate.yml")
     assert "live-image-verification" in pr_gate
