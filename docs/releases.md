@@ -91,6 +91,14 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.5.0 (Feature roadmap follow-ups: TLS example, IPv6, SOCKS policy)
+
+- **GeoIP User-Agent fix (ISSUE-20 regression, #113, PR #114):** the GeoIP downloader no longer sends the custom `torproxy-geoip/1` User-Agent — GitLab answers raw files only to known UA patterns (`curl/*`, `Python-urllib/*`) with HTTP 403 for custom UAs. The daily canary failure is fixed; fallback to the bundled database was already working.
+- **Feature roadmap (ISSUE-18, #82, PR #109):** `docs/roadmap-features.md` records TLS termination, IPv6 listen addresses and SOCKS5 auth as roadmap entries with threat assessments; follow-up issues #106, #107, #108.
+- **TLS reverse-proxy example (ISSUE-18a, #106, PR #110):** `examples/tls-reverse-proxy/` — Caddy terminates TLS in front of the HTTP-only API (loopback-only by default), cross-referenced from `SECURITY.md`. No container behavior change.
+- **IPv6 listen addresses (ISSUE-18b, #107, PR #111):** `TORPROXY_LISTEN_ADDRESS` / `TORPROXY_API_LISTEN_ADDRESS` accept IPv4 or IPv6 (`ipaddress.ip_address()`); the API server binds `AF_INET6` for IPv6 values. Defaults (`0.0.0.0`) unchanged.
+- **SOCKS source-IP access control (ISSUE-18c, #108, PR #112):** new optional `TORPROXY_SOCKS_ALLOWED_CIDRS` renders Tor `SocksPolicy` (accept listed CIDRs + loopback, reject all else; default unset = accept all). Tor's SocksPort is unauthenticated by design — client username/password is only stream isolation, never a credential check — so source-IP policy is the strongest access control Tor itself offers; documented in `docs/configuration.md` / `docs/compatibility.md`.
+
 ### 2.4.0 (Probe diagnosis & Privoxy ADR)
 
 - **Egress probe failure taxonomy (ISSUE-12, #76, PR #104):** `TorEgressProbe` now distinguishes `local HTTP proxy unreachable` (connection refused on `127.0.0.1:8118`, e.g. Privoxy down while SOCKS5/Tor may be healthy), `Tor upstream unavailable via local HTTP proxy (HTTP 5xx)` (proxy answered 5xx, no Tor circuit ready), `egress check service returned HTTP 4xx` (check service answered, e.g. 429 rate-limit — not a Tor failure), and `egress check service unreachable`. An open circuit breaker keeps the original cause. Error strings are stable and leak-free; `status` values and JSON shapes are unchanged.
