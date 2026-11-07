@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from torproxy.configuration import Settings, render_torrc
+from torproxy.runtime.geoip import has_valid_geoip, update_geoip
 
 
 def main() -> None:
@@ -23,7 +24,15 @@ def main() -> None:
     ):
         template = template.replace(f"__TORPROXY_{key}__", value)
     Path("/tmp/privoxy.config").write_text(template)
-    Path("/tmp/torrc").write_text(render_torrc(settings, Path("/etc/tor/torrc").read_text()))
+    # ISSUE-20: best-effort GeoIP refresh at startup. On failure the
+    # bundled /usr/share/tor/geoip{,6} stays in use (fallback).
+    geoip_active = False
+    if settings.geoip_auto_update:
+        update_geoip(settings)
+        geoip_active = has_valid_geoip(settings)
+    Path("/tmp/torrc").write_text(
+        render_torrc(settings, Path("/etc/tor/torrc").read_text(), geoip_active=geoip_active)
+    )
 
 
 if __name__ == "__main__":

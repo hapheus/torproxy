@@ -180,6 +180,7 @@ Default settings require no configuration. You can customize listening ports and
 | `TORPROXY_SOCKS_PORT` | `9050` | `1024`–`65535` | Tor SOCKS5 proxy port (host and container). |
 | `TORPROXY_COUNTRY` | *(unset)* | ISO 3166-1 alpha-2 (e.g. `DE`, `AT`, `US`, `DE,AT`) | Route Tor exit circuits through specific countries using `tor-geoipdb`. |
 | `TORPROXY_STRICT_NODES` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
+| `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Opt-in: periodically download Tor's GeoIP database (`geoip`/`geoip6`) from Tor Project GitLab and reload Tor. On failure the bundled/previous database keeps working. See [GeoIP auto-update](#geoip-auto-update). |
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API port 8080. Recommended for production. |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | `0`, `1`, `true`, `false` | Optional: Allow unauthenticated `/health` probing when `TORPROXY_API_TOKEN` is set. |
 | `TORPROXY_GATEWAY_MODE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Enable Transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
@@ -187,6 +188,16 @@ Default settings require no configuration. You can customize listening ports and
 | `TORPROXY_DNS_PORT` | `9053` | `1024`–`65535` | Listening port for Tor DNSPort when gateway mode is enabled. |
 
 All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
+
+### GeoIP Auto-Update
+
+By default `torproxy` uses the Tor GeoIP database bundled with the Alpine Tor package (`/usr/share/tor/geoip{,6}`), which is only refreshed when the Docker image is rebuilt. To keep country routing (`TORPROXY_COUNTRY=DE`) on a fresh IP-to-country mapping, enable the opt-in auto-update:
+
+```sh
+TORPROXY_GEOIP_AUTO_UPDATE=1 TORPROXY_COUNTRY=DE docker compose up -d
+```
+
+With `TORPROXY_GEOIP_AUTO_UPDATE=1` the container downloads `geoip`/`geoip6` from Tor Project GitLab (HTTPS) at startup and then every `TORPROXY_GEOIP_UPDATE_INTERVAL` seconds (default `86400` = 24h), validates the format, installs the files atomically into `TORPROXY_GEOIP_DIR` (default `/var/lib/tor/geoip`), and sends Tor `SIGHUP` to reload them. If the download or validation fails (e.g. offline or upstream unavailable), the previously installed — or bundled — database keeps working, so an old version never breaks country routing. The Daily Live Image Verification workflow checks daily that the GeoIP URLs are reachable and that a container with auto-update enabled downloads the database. Additional settings: `TORPROXY_GEOIP_URL`, `TORPROXY_GEOIP6_URL`, `TORPROXY_GEOIP_MAX_BYTES`.
 
 ---
 

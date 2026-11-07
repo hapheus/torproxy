@@ -9,6 +9,7 @@ DataDirectory /var/lib/tor
 # setgroups privilege Tor does not have as a non-root user.
 GeoIPFile /usr/share/tor/geoip
 GeoIPv6File /usr/share/tor/geoip6
+PidFile /tmp/tor.pid
 RunAsDaemon 0
 AvoidDiskWrites 1
 ClientOnly 1
