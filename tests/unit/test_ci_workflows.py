@@ -54,7 +54,13 @@ def test_live_verification_is_a_reusable_workflow() -> None:
 def test_pr_gate_runs_live_verification_before_merge() -> None:
     pr_gate = _read("pr-gate.yml")
     assert "live-image-verification" in pr_gate
-    assert "./.github/workflows/live-image-verification.yml" in pr_gate
+    # Relative reusable paths fail on pull_request events (GitHub
+    # resolves them against the simulated merge commit), so the PR
+    # gate pins the reusable workflow to the PR head branch.
+    assert (
+        "hapheus/torproxy/.github/workflows/live-image-verification.yml@${{ github.head_ref }}"
+        in pr_gate
+    )
 
 
 def test_publish_waits_for_live_verification() -> None:

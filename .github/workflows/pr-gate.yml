@@ -344,7 +344,9 @@ jobs:
   live-image-verification:
     name: "Live Image Verification (Pre-Publish Gate)"
     needs: [lint-and-validate, unit-tests, docker-smoke]
-    uses: ./.github/workflows/live-image-verification.yml
+    # Pinned to the PR head branch: a relative reusable path fails
+    # on pull_request events (resolved against the merge commit).
+    uses: hapheus/torproxy/.github/workflows/live-image-verification.yml@${{ github.head_ref }}
     with:
       image_ref: "torproxy:smoke-test"
       build_local: true
