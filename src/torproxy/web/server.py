@@ -2,6 +2,7 @@
 
 import hmac
 import json
+import re
 import socket
 import threading
 import time
@@ -25,6 +26,7 @@ class APIHandler(BaseHTTPRequestHandler):
 
     MUTATION_PATHS = ("connect", "disconnect", "reconnect")
     LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+    SAFE_REQUEST_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.]{1,64}\Z")
 
     def _is_same_origin(self) -> bool:
         """CSRF guard for mutations: browser cross-origin requests carry Origin/Referer.
@@ -113,7 +115,12 @@ class APIHandler(BaseHTTPRequestHandler):
     def _handle(self) -> None:
         started = time.monotonic()
         # ISSUE-14: correlation id echoed on every response and in logs.
-        self.request_id = self.headers.get("X-Request-ID", "").strip() or str(uuid.uuid4())
+        # Sanitize incoming header to safe characters to prevent HTTP response splitting.
+        candidate_rid = self.headers.get("X-Request-ID", "").strip()
+        if candidate_rid and self.SAFE_REQUEST_ID_PATTERN.fullmatch(candidate_rid):
+            self.request_id = candidate_rid
+        else:
+            self.request_id = str(uuid.uuid4())
         try:
             parsed = urllib.parse.urlsplit(self.path)
             clean_path = parsed.path.strip("/")
@@ -253,6 +260,7 @@ class ProxyHTTPServer(ThreadingHTTPServer):
             sock = request[1] if isinstance(request, tuple) else request  # type: ignore[assignment]
             sock.sendall(raw)
         except OSError:
+            # Client disconnected before 503 response could be sent
             pass
 
     def process_request_thread(

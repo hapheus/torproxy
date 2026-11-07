@@ -147,6 +147,20 @@ class TestIssue14AnonymousHealthAndRequestId:
             with urllib.request.urlopen(req) as resp:
                 assert resp.headers.get("X-Request-ID") == "abc-123"
 
+    def test_request_id_malformed_falls_back_to_uuid(self, api_server):
+        req = urllib.request.Request(
+            f"{api_server}/status",
+            headers={"X-Request-ID": "bad id with spaces and <brackets>"},
+        )
+        with patch("tests.support.api.send_tor_command") as mock_tor:
+            mock_tor.return_value = ("250 DisableNetwork=1", None)
+            with urllib.request.urlopen(req) as resp:
+                rid = resp.headers.get("X-Request-ID")
+                assert rid != "bad id with spaces and <brackets>"
+                assert " " not in rid and "<" not in rid
+                # Falls back to generated UUID (length 36, contains hyphens)
+                assert len(rid) == 36
+
     def test_health_stale_field_present(self, api_server):
         with (
             patch("tests.support.api.send_tor_command") as mock_tor,
@@ -184,7 +198,8 @@ class TestIssue06CircuitBreaker:
         import os
 
         path = os.path.join(os.path.dirname(__file__), "..", "..", "docker", "healthcheck.sh")
-        content = open(path).read()
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
         # No external fetch URL may remain (the explanatory comment is allowed).
         assert "http://config.privoxy.org" not in content
         assert "127.0.0.1" in content
@@ -206,6 +221,7 @@ class TestIssue13Gateway:
             "transparent-tor-gateway",
             "README.md",
         )
-        content = open(path).read()
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
         assert "FORWARD DROP" in content
         assert "127.0.0.11" in content
