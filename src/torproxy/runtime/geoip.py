@@ -9,6 +9,7 @@ for download/validation failures (callers decide how to log).
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import signal
@@ -22,8 +23,9 @@ from torproxy.configuration import Settings
 
 Fetcher = Callable[[str, int], bytes]
 
-_LINE_V4 = re.compile(r"(\d{1,10}),(\d{1,10}),([A-Z]{2})\Z")
-_LINE_V6 = re.compile(r"([0-9A-Fa-f:]+),([0-9A-Fa-f:]+),([A-Z]{2})\Z")
+# Upstream marks ranges of unknown origin with the literal "??".
+_LINE_V4 = re.compile(r"(\d{1,10}),(\d{1,10}),([A-Z]{2}|\?\?)\Z")
+_LINE_V6 = re.compile(r"([0-9A-Fa-f:]+),([0-9A-Fa-f:]+),([A-Z]{2}|\?\?)\Z")
 
 
 def validate_geoip_content(data: bytes, ipv6: bool) -> bool:
@@ -58,8 +60,52 @@ def _https_fetch(url: str, max_bytes: int) -> bytes:
     with urllib.request.urlopen(request, timeout=30) as response:
         data = response.read(max_bytes + 1)
     if len(data) > max_bytes:
-        raise ValueError("GeoIP database exceeds TORPROXY_GEOIP_MAX_BYTES")
+        raise ValueError(f"GeoIP database exceeds limit of {max_bytes} bytes")
     return data
+
+
+def _write_status(
+    settings: Settings,
+    *,
+    source: str,
+    last_error: str | None,
+    last_success_at: float | None,
+    v4_bytes: int | None = None,
+    v6_bytes: int | None = None,
+) -> None:
+    """Record the latest auto-update outcome for /status (best-effort).
+
+    The GeoIP updater runs as its own process, so it cannot share
+    memory with the API. A tiny JSON status file in the GeoIP dir
+    bridges the two; the API reads it via an adapter (ISSUE-117).
+    """
+    previous_success = last_success_at
+    try:
+        previous = json.loads(
+            (Path(settings.geoip_dir) / "geoip-status.json").read_text(encoding="utf-8")
+        )
+        if previous_success is None:
+            previous_success = previous.get("last_success_at")
+    except (OSError, ValueError):
+        # No previous status file (first run) or unreadable/corrupt:
+        # start fresh, keeping only the just-recorded success time.
+        pass
+    payload = {
+        "source": source,
+        "last_attempt_at": time.time(),
+        "last_success_at": previous_success,
+        "last_error": last_error,
+        "v4_bytes": v4_bytes,
+        "v6_bytes": v6_bytes,
+    }
+    try:
+        target_dir = Path(settings.geoip_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        tmp = target_dir / ".geoip-status.json.tmp"
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        tmp.replace(target_dir / "geoip-status.json")
+    except OSError:
+        pass  # observability must never break the fallback guarantee
 
 
 def update_geoip(settings: Settings, fetcher: Fetcher | None = None) -> bool:
@@ -71,12 +117,24 @@ def update_geoip(settings: Settings, fetcher: Fetcher | None = None) -> bool:
     fetch = fetcher or _https_fetch
     try:
         v4 = fetch(settings.geoip_url, settings.geoip_max_bytes)
-        v6 = fetch(settings.geoip6_url, settings.geoip_max_bytes)
+        v6 = fetch(settings.geoip6_url, settings.geoip6_max_bytes)
     except Exception as error:  # network, TLS, size, URL errors -> keep old DB
         print(f"[geoip] download failed, keeping previous database: {error}", file=sys.stderr)
+        _write_status(
+            settings,
+            source="bundled" if not has_valid_geoip(settings) else "downloaded",
+            last_error=str(error),
+            last_success_at=None,
+        )
         return False
     if not validate_geoip_content(v4, ipv6=False) or not validate_geoip_content(v6, ipv6=True):
         print("[geoip] invalid GeoIP payload, keeping previous database", file=sys.stderr)
+        _write_status(
+            settings,
+            source="bundled" if not has_valid_geoip(settings) else "downloaded",
+            last_error="invalid GeoIP payload",
+            last_success_at=None,
+        )
         return False
 
     target_dir = Path(settings.geoip_dir)
@@ -101,7 +159,21 @@ def update_geoip(settings: Settings, fetcher: Fetcher | None = None) -> bool:
             tmp.replace(target_dir / name)
     except OSError as error:
         print(f"[geoip] install failed, keeping previous database: {error}", file=sys.stderr)
+        _write_status(
+            settings,
+            source="bundled" if not has_valid_geoip(settings) else "downloaded",
+            last_error=str(error),
+            last_success_at=None,
+        )
         return False
+    _write_status(
+        settings,
+        source="downloaded",
+        last_error=None,
+        last_success_at=time.time(),
+        v4_bytes=len(v4),
+        v6_bytes=len(v6),
+    )
     return True
 
 

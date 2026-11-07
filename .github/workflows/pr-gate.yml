@@ -340,3 +340,24 @@ jobs:
         run: |
           docker rm -f torproxy-smoke torproxy-hardened-test torproxy-prev torproxy-upgrade torproxy-gateway-smoke || true
           docker compose down -v || true
+
+  live-image-verification:
+    name: "Live Image Verification (Pre-Publish Gate)"
+    needs: [lint-and-validate, unit-tests, docker-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Composite action (not a reusable workflow): relative reusable
+      # paths fail on pull_request events (startup_failure, 0 jobs)
+      # because GitHub resolves them against the merge commit.
+      - name: Run Live Image Verification
+        uses: ./.github/actions/live-verification
+        with:
+          image_ref: "torproxy:smoke-test"
+          build_local: "true"
+          run_alerts: "false"
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}

@@ -74,7 +74,11 @@ class Settings:
     geoip_dir: str = "/var/lib/tor/geoip"
     geoip_url: str = "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip"
     geoip6_url: str = "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6"
-    geoip_max_bytes: int = 10 * 1024 * 1024
+    # ISSUE-117: per-file limits. The IPv4 and IPv6 upstream
+    # databases grow independently (geoip6 is ~16 MB, geoip ~10 MB),
+    # so a single shared cap silently rejected the IPv6 file forever.
+    geoip_max_bytes: int = 16 * 1024 * 1024
+    geoip6_max_bytes: int = 32 * 1024 * 1024
     # ISSUE-18c (#108): optional comma-separated CIDRs allowed to
     # use the SOCKS port (Tor SocksPolicy). Empty = accept all
     # (legacy behavior). Tor's SocksPort is unauthenticated by
@@ -127,6 +131,8 @@ class Settings:
             raise ValueError("TORPROXY_GEOIP_UPDATE_INTERVAL must be a positive integer")
         if self.geoip_max_bytes < 1:
             raise ValueError("TORPROXY_GEOIP_MAX_BYTES must be a positive integer")
+        if self.geoip6_max_bytes < 1:
+            raise ValueError("TORPROXY_GEOIP6_MAX_BYTES must be a positive integer")
         if not self.geoip_dir.startswith("/"):
             raise ValueError("TORPROXY_GEOIP_DIR must be an absolute path")
         for name, url in (
@@ -224,7 +230,14 @@ class Settings:
                 "TORPROXY_GEOIP6_URL",
                 "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6",
             ),
-            geoip_max_bytes=_int_setting("TORPROXY_GEOIP_MAX_BYTES", 10 * 1024 * 1024),
+            geoip_max_bytes=_int_setting("TORPROXY_GEOIP_MAX_BYTES", 16 * 1024 * 1024),
+            # Backward compat: the legacy single TORPROXY_GEOIP_MAX_BYTES
+            # still caps both files unless TORPROXY_GEOIP6_MAX_BYTES
+            # explicitly overrides the IPv6 limit.
+            geoip6_max_bytes=_int_setting(
+                "TORPROXY_GEOIP6_MAX_BYTES",
+                int(env.get("TORPROXY_GEOIP_MAX_BYTES", str(32 * 1024 * 1024))),
+            ),
             socks_allowed_cidrs=env.get("TORPROXY_SOCKS_ALLOWED_CIDRS", "").strip(),
         )
 

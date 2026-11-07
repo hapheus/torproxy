@@ -44,6 +44,8 @@ This document defines the strict, non-negotiable backward compatibility contract
 | `TORPROXY_COUNTRY` | *(unset)* | Comma-separated ISO codes | Optional: Restricts Tor exit nodes by country. Default: standard unrestricted Tor routing. |
 | `TORPROXY_STRICT_NODES` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Refuse circuits if country exit nodes are unavailable. Default: `0`. |
 | `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | Boolean (`0`, `1`, `true`, `false`, `yes`, `no`) | Optional additive: Periodically download Tor GeoIP DB from Tor Project GitLab. Default: `0` (bundled DB, unchanged behavior). |
+| `TORPROXY_GEOIP_MAX_BYTES` | `16777216` | Positive integer | Optional additive: Max accepted IPv4 GeoIP payload; also caps IPv6 unless `TORPROXY_GEOIP6_MAX_BYTES` is set (backward compatible). |
+| `TORPROXY_GEOIP6_MAX_BYTES` | `33554432` | Positive integer | Optional additive: Max accepted IPv6 GeoIP payload (upstream `geoip6` ≈ 16 MB). |
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API (8080). Default: unset (unauthenticated). |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Permits unauthenticated `/health` probe access when token auth is enabled. |
 | `TORPROXY_SOCKS_ALLOWED_CIDRS` | *(unset)* | Comma-separated CIDRs | Optional: Restricts SOCKS port access by source CIDR (Tor `SocksPolicy`). Default unset = accept all (legacy behavior). |
@@ -73,7 +75,7 @@ The `status` field must strictly evaluate to one of the following canonical stri
 - `"connecting"`: Tor is bootstrapping or initial circuit is not yet ready.
 - `"disconnected"`: Network disabled via `/disconnect`.
 
-Optional additive fields such as `detail` may be included, but `status` and `ip` must never be omitted or renamed.
+Optional additive fields such as `detail` and `geoip` (GeoIP auto-update outcome: `auto_update`, `source`, `last_attempt_at`, `last_success_at`, `last_error`, `v4_bytes`, `v6_bytes`) may be included, but `status` and `ip` must never be omitted or renamed.
 
 ---
 

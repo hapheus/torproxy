@@ -6,7 +6,7 @@ from typing import Any
 
 from torproxy.configuration import Settings, validate_country_input, validate_strict_nodes_input
 from torproxy.models import BootstrapResult, CommandResult
-from torproxy.ports import ControlPort, EgressProbe, SocksProbe
+from torproxy.ports import ControlPort, EgressProbe, GeoIpStatus, SocksProbe
 from torproxy.state import RuntimeState
 
 
@@ -26,12 +26,16 @@ class ProxyService:
         egress: EgressProbe,
         socks: SocksProbe,
         state: RuntimeState,
+        geoip: GeoIpStatus | None = None,
     ) -> None:
         self.settings = settings
         self.control = control
         self.egress = egress
         self.socks = socks
         self.state = state
+        # ISSUE-117: optional GeoIP auto-update outcome (separate
+        # process records it to a status file; adapter reads it).
+        self.geoip = geoip
         # ISSUE-10: single-flight for egress probes. The flag is only set
         # while one probe is in flight; concurrent callers wait on it
         # rather than each firing an upstream request (thundering herd).
@@ -96,6 +100,14 @@ class ProxyService:
 
     def check_socks5_ready(self) -> bool:
         return self.socks.ready()
+
+    def geoip_snapshot(self) -> dict[str, Any] | None:
+        if self.geoip is None:
+            return None
+        try:
+            return self.geoip.snapshot()
+        except Exception:  # observability must never break /status
+            return None
 
     def _command(self, command: str, message: str) -> None:
         _, error = self.send_tor_command(command)
