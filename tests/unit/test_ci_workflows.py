@@ -83,6 +83,16 @@ def test_gateway_bootstrap_is_polled_inside_the_container_in_live_action() -> No
     ).read_text(encoding="utf-8")
     assert "docker exec torproxy-canary-gateway curl" in live
     assert "http://localhost:8089/status" not in live
+    # Bootstrap waits must use Tor progress (100%), not /status
+    # "connected", which additionally depends on the external
+    # check.torproject.org egress probe (PR #121 flake).
+    assert ".tor.progress" in live
+    assert (
+        "8080/status"
+        not in live.split("Verify Transparent Tor Gateway Mode")[1].split(
+            "Verify GeoIP Upstream Size Drift Guard"
+        )[0]
+    )
 
 
 def test_pr_gate_runs_live_verification_before_merge() -> None:
