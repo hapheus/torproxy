@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.1.1 (Python/toolchain alignment)
+
+- **Python/toolchain drift fixed (ISSUE-15, #79):** the image interpreter is pinned to Python 3.14 (`ARG PYTHON_VERSION` + `apk add python3~3.14`) with a fail-fast build-time version assert; `torproxy` is installed into the `sysconfig`-derived `site-packages` instead of the Debian-specific `dist-packages` path (no `PYTHONPATH` needed); the hermetic CI matrix now covers 3.10 (declared minimum), 3.11, and 3.14; the image build logs the Python version and runs an import self-test. No application behavior changed. Original approach contributed by @Joffy-Maria (#93).
+
 ### 2.1.0 (Sprint 2: gateway security architecture)
 
 - **Kill-switch fail-closed restored (ISSUE-02):** removed the unrestricted `ESTABLISHED,RELATED` accept from filter OUTPUT; pre-existing clearnet connections no longer survive a Tor outage.
