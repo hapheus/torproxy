@@ -11,7 +11,22 @@ permissions:
   contents: read
 
 jobs:
+  # ISSUE-117: never publish an image that has not passed the live
+  # Tor verification (bootstrap, egress, gateway, GeoIP) against a
+  # build from the same commit. Previously the image was published
+  # first and only checked afterwards by the daily canary.
+  verify-live:
+    name: "Live Image Verification (Pre-Publish Gate)"
+    uses: ./.github/workflows/live-image-verification.yml
+    with:
+      image_ref: "torproxy:smoke-test"
+      build_local: true
+      run_alerts: false
+    permissions:
+      contents: read
+
   publish:
+    needs: verify-live
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

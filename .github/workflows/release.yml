@@ -9,6 +9,9 @@ name: Release
 #   and reviewed via release PRs on release branches before tagging.
 # - This workflow generates the release-specific notes deterministically using
 #   `git-cliff` and publishes the official GitHub Release for the tag.
+# - ISSUE-117: the GitHub Release is only created after the same live
+#   Tor verification that gates publishing has passed for this tag, so a
+#   broken image can no longer ship as an official release.
 
 on:
   push:
@@ -19,8 +22,19 @@ permissions:
   contents: read
 
 jobs:
+  verify-live:
+    name: "Live Image Verification (Pre-Release Gate)"
+    uses: ./.github/workflows/live-image-verification.yml
+    with:
+      image_ref: "torproxy:smoke-test"
+      build_local: true
+      run_alerts: false
+    permissions:
+      contents: read
+
   github-release:
     name: "Generate Changelog & Publish GitHub Release"
+    needs: verify-live
     runs-on: ubuntu-latest
     permissions:
       contents: write

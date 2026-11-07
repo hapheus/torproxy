@@ -15,10 +15,10 @@ WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 
 def _curl_http_lines() -> list[str]:
     lines: list[str] = []
-    pr_gate = WORKFLOWS / "pr-gate.yml"
-    for line in pr_gate.read_text(encoding="utf-8").splitlines():
-        if "curl" in line and "http" in line:
-            lines.append(line)
+    for workflow in ("pr-gate.yml", "live-image-verification.yml"):
+        for line in (WORKFLOWS / workflow).read_text(encoding="utf-8").splitlines():
+            if "curl" in line and "http" in line:
+                lines.append(line)
     return lines
 
 
@@ -33,3 +33,45 @@ def test_gateway_bootstrap_is_polled_inside_the_container() -> None:
     # switch; polling over loopback inside the container does not.
     assert "docker exec torproxy-gateway-smoke curl" in pr_gate
     assert "curl -s http://127.0.0.1:8085/status" not in pr_gate
+
+
+def _read(name: str) -> str:
+    return (WORKFLOWS / name).read_text(encoding="utf-8")
+
+
+def test_live_verification_is_a_reusable_workflow() -> None:
+    # ISSUE-117: the live check must run before publish/release, not
+    # only after it (daily workflow_run). A reusable workflow lets the
+    # PR gate, publish and daily canary share one implementation.
+    live = _read("live-image-verification.yml")
+    assert "workflow_call:" in live
+    assert "Verify GeoIP Database Availability & Auto-Update" in live
+    # Upstream drift guard: HEAD sizes must fit the configured limits.
+    assert "Content-Length" in live
+    assert "geoip6_max_bytes" in live
+
+
+def test_pr_gate_runs_live_verification_before_merge() -> None:
+    pr_gate = _read("pr-gate.yml")
+    assert "live-image-verification" in pr_gate
+    assert "./.github/workflows/live-image-verification.yml" in pr_gate
+
+
+def test_publish_waits_for_live_verification() -> None:
+    publish = _read("publish-dockerhub.yml")
+    assert "./.github/workflows/live-image-verification.yml" in publish
+    assert "needs: verify-live" in publish or "needs: [verify-live]" in publish
+
+
+def test_release_waits_for_live_verification() -> None:
+    release = _read("release.yml")
+    assert "./.github/workflows/live-image-verification.yml" in release
+    assert "verify-live" in release
+
+
+def test_daily_canary_reuses_the_shared_workflow() -> None:
+    daily = _read("daily-image-verification.yml")
+    assert "schedule:" in daily
+    assert "./.github/workflows/live-image-verification.yml" in daily
+    # The daily run verifies the published image, it must not rebuild it.
+    assert "build_local" in daily

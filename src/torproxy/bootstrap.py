@@ -1,10 +1,11 @@
 """The only composition root that selects concrete I/O adapters."""
 
 from torproxy.adapters.clock import SystemClock
+from torproxy.adapters.geoip_status import FileGeoIpStatus
 from torproxy.adapters.probes import SocksReadinessProbe, TorEgressProbe
 from torproxy.adapters.tor_control import TorControlClient
 from torproxy.configuration import Settings
-from torproxy.ports import Clock, ControlPort, EgressProbe, SocksProbe
+from torproxy.ports import Clock, ControlPort, EgressProbe, GeoIpStatus, SocksProbe
 from torproxy.service import ProxyService
 from torproxy.state import RuntimeState
 from torproxy.web.router import Router
@@ -18,6 +19,7 @@ def create_services(
     egress: EgressProbe | None = None,
     socks: SocksProbe | None = None,
     clock: Clock | None = None,
+    geoip: GeoIpStatus | None = None,
 ) -> ProxyService:
     return ProxyService(
         settings,
@@ -25,6 +27,7 @@ def create_services(
         egress or TorEgressProbe(settings.proxy_port),
         socks or SocksReadinessProbe(settings.socks_port),
         RuntimeState(settings.country, settings.strict_nodes, clock or SystemClock()),
+        geoip if geoip is not None else FileGeoIpStatus(settings.geoip_dir),
     )
 
 

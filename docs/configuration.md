@@ -26,7 +26,8 @@ All settings have sensible defaults that allow running `torproxy` with zero conf
 | `TORPROXY_GEOIP_DIR` | `/var/lib/tor/geoip` | Absolute path | Directory where validated `geoip`/`geoip6` files are installed atomically. |
 | `TORPROXY_GEOIP_URL` | Tor Project GitLab `geoip` | `https://` URL | Source URL for the IPv4 GeoIP database. |
 | `TORPROXY_GEOIP6_URL` | Tor Project GitLab `geoip6` | `https://` URL | Source URL for the IPv6 GeoIP database. |
-| `TORPROXY_GEOIP_MAX_BYTES` | `10485760` | Positive integer | Maximum accepted size per GeoIP file; larger payloads are rejected. |
+| `TORPROXY_GEOIP_MAX_BYTES` | `16777216` | Positive integer | Maximum accepted size of the IPv4 GeoIP file; larger payloads are rejected. Setting this also caps the IPv6 file (backward compatibility) unless overridden below. |
+| `TORPROXY_GEOIP6_MAX_BYTES` | `33554432` | Positive integer | Maximum accepted size of the IPv6 GeoIP file (upstream `geoip6` is ~16 MB); defaults to `TORPROXY_GEOIP_MAX_BYTES` when that is set explicitly. |
 | `TORPROXY_SOCKS_ALLOWED_CIDRS` | *(unset)* | Comma-separated CIDRs | Optional: Restrict which source networks may use the SOCKS port (Tor `SocksPolicy` — accept listed CIDRs plus loopback, reject all else). Default unset = accept all (legacy behavior). Note: Tor's SocksPort is unauthenticated by design; client username/password is only stream isolation, not a credential check. |
 
 ---
@@ -120,3 +121,5 @@ Dynamic changes are applied via Tor Control Protocol (`SETCONF ExitNodes=...`) a
 Enable `TORPROXY_GEOIP_AUTO_UPDATE=1` to download `geoip`/`geoip6` from Tor Project GitLab over HTTPS at startup and every `TORPROXY_GEOIP_UPDATE_INTERVAL` seconds (default `86400`). Downloaded files are format-validated and installed atomically into `TORPROXY_GEOIP_DIR` (default `/var/lib/tor/geoip`); Tor is then sent `SIGHUP` to reload them (`PidFile /tmp/tor.pid`).
 
 **Fallback guarantee:** if the upstream is unreachable or the payload is invalid, the previously installed database — or, on first start, the bundled `/usr/share/tor/geoip{,6}` — keeps working. The container never fails to start because of GeoIP download problems, and a working database is never overwritten by a broken payload.
+
+**Observability:** every attempt is recorded to `geoip-status.json` in `TORPROXY_GEOIP_DIR` and surfaced additively as the `geoip` object in `/status` (`source` = `downloaded`/`bundled`/`unknown`, `last_attempt_at`, `last_success_at`, `last_error`, `v4_bytes`, `v6_bytes`), so a silent fallback — e.g. an upstream file outgrowing its size limit — is visible without reading container logs.

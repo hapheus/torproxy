@@ -1,6 +1,6 @@
 """Small structural interfaces; application code does not import adapters."""
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from torproxy.models import CommandResult
 
@@ -26,3 +26,8 @@ class Clock(Protocol):
 
     def time(self) -> float:
         """Return wall-clock epoch time in seconds."""
+
+
+class GeoIpStatus(Protocol):
+    def snapshot(self) -> dict[str, Any] | None:
+        """Return the latest GeoIP auto-update outcome, or None if unknown."""

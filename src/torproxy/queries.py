@@ -17,12 +17,35 @@ class ProxyQueries:
     def __init__(self, service: ProxyService) -> None:
         self.service = service
 
+    def _geoip_info(self) -> dict[str, Any]:
+        # ISSUE-117: additive observability so a silent fallback to
+        # the bundled GeoIP DB (e.g. upstream file outgrew the size
+        # limit) is visible in /status instead of only in logs.
+        info: dict[str, Any] = {
+            "auto_update": self.service.settings.geoip_auto_update,
+            "source": "unknown",
+            "last_attempt_at": None,
+            "last_success_at": None,
+            "last_error": None,
+        }
+        snapshot = self.service.geoip_snapshot()
+        if snapshot:
+            for key in ("source", "last_attempt_at", "last_success_at", "last_error"):
+                if key in snapshot:
+                    info[key] = snapshot[key]
+            for key in ("v4_bytes", "v6_bytes"):
+                if isinstance(snapshot.get(key), int):
+                    info[key] = snapshot[key]
+        return info
+
     def status(self) -> Response:
         response, error = self.service.send_tor_command("GETCONF DisableNetwork")
         if error:
             return Response(500, {"error": f"Failed to query Tor: {error}"})
         if "DisableNetwork=0" not in (response or ""):
-            return Response(200, {"status": "disconnected", "ip": None})
+            return Response(
+                200, {"status": "disconnected", "ip": None, "geoip": self._geoip_info()}
+            )
         bootstrap, error = self.service.get_tor_bootstrap_status()
         if not bootstrap or not bootstrap["bootstrapped"]:
             detail = bootstrap["summary"] if bootstrap else error or "Unknown bootstrap status"
@@ -32,17 +55,19 @@ class ProxyQueries:
                     "status": "connecting",
                     "ip": None,
                     "detail": f"Tor bootstrapping: {detail}",
+                    "geoip": self._geoip_info(),
                 },
             )
         ip, error = self.service.get_current_ip()
         if ip:
-            return Response(200, {"status": "connected", "ip": ip})
+            return Response(200, {"status": "connected", "ip": ip, "geoip": self._geoip_info()})
         return Response(
             200,
             {
                 "status": "connecting",
                 "ip": None,
                 "detail": f"Failed to route traffic (Tor bootstrapping?): {error}",
+                "geoip": self._geoip_info(),
             },
         )
 
