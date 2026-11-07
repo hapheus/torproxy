@@ -1,0 +1,36 @@
+services:
+  torproxy:
+    image: hapheus/torproxy:latest
+    container_name: torproxy-tls
+    restart: unless-stopped
+    environment:
+      # Optional: protect the API even inside the Docker network.
+      # Caddy below forwards the token header unchanged; set a real
+      # secret via your secret manager, never commit it.
+      TORPROXY_API_TOKEN: "${TORPROXY_API_TOKEN:-}"
+    # No published ports: torproxy is only reachable on the
+    # internal Docker network (by Caddy and local containers).
+    expose:
+      - "8080"
+      - "8118"
+      - "9050"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: torproxy-caddy
+    restart: unless-stopped
+    depends_on:
+      torproxy:
+        condition: service_healthy
+    ports:
+      # Loopback-only by default: never expose this to the internet
+      # without a real domain, firewall rules and rate limiting.
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

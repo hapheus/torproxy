@@ -214,6 +214,44 @@ class TestMacOSChromeExample:
 
 
 @pytest.mark.unit
+class TestTlsReverseProxyExample:
+    """ISSUE-18a (#106): TLS termination via reverse proxy example."""
+
+    def test_tls_example_compose_structure(self):
+        compose_path = os.path.join(EXAMPLES_DIR, "tls-reverse-proxy", "docker-compose.yml")
+        assert os.path.exists(compose_path), "Missing tls-reverse-proxy docker-compose.yml"
+        with open(compose_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        assert "services" in data
+        assert "torproxy" in data["services"]
+        assert "caddy" in data["services"]
+
+        tor_svc = data["services"]["torproxy"]
+        # torproxy must not publish the API port to the host;
+        # only Caddy publishes (loopback-only by default).
+        tor_ports = tor_svc.get("ports", [])
+        assert not tor_ports, "torproxy must not publish ports in the TLS example"
+
+        caddy_ports = data["services"]["caddy"].get("ports", [])
+        assert caddy_ports, "caddy must publish a port"
+        for port_spec in caddy_ports:
+            assert port_spec.startswith("127.0.0.1:"), f"Unsafe port binding: {port_spec}"
+
+    def test_tls_example_readme_documentation(self):
+        readme_path = os.path.join(EXAMPLES_DIR, "tls-reverse-proxy", "README.md")
+        assert os.path.exists(readme_path), "Missing tls-reverse-proxy README.md"
+        with open(readme_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "## Architecture" in content
+        assert "## Prerequisites" in content
+        assert "## Quick start" in content
+        assert "docker compose down" in content
+        assert "curl" in content
+        assert "https://" in content
+
+
+@pytest.mark.unit
 class TestTransparentGatewayExample:
     """Validate transparent Tor gateway compose and documentation."""
 
