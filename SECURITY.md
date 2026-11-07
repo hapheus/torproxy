@@ -47,7 +47,7 @@ Please **do not** report security vulnerabilities via public GitHub issues.
 - **Default Authentication**: The REST API on port `8080` is unauthenticated by default to provide a lightweight developer and automation experience with zero breaking changes.
 - **Optional API Token Hardening (Recommended)**: Setting `TORPROXY_API_TOKEN` (or `TORPROXY_API_KEY`) protects all endpoints against unauthorized state mutations and telemetry inspection. Requests require `Authorization: Bearer <token>` or `X-API-Key: <token>`, verified using constant-time comparison (`hmac.compare_digest`).
 - **Orchestration Probes**: Setting `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH=1` permits unauthenticated `/health` probing by Kubernetes or load balancers while protecting mutations and sensitive data.
-- **Publication Warning**: Port `8080` must **never** be exposed to untrusted networks or the public internet without authentication (via `TORPROXY_API_TOKEN` or an authenticating reverse proxy such as Caddy, Nginx, or Traefik with HTTP Basic Auth / OAuth / mTLS).
+- **Publication Warning**: Port `8080` must **never** be exposed to untrusted networks or the public internet without authentication (via `TORPROXY_API_TOKEN` or an authenticating reverse proxy such as Caddy, Nginx, or Traefik with HTTP Basic Auth / OAuth / mTLS). A tested Caddy example with TLS termination is shipped in `examples/tls-reverse-proxy/` (ISSUE-18a, #106).
 - **Default Loopback Binding**: In `docker-compose.yml`, all published ports bind explicitly to `127.0.0.1`.
 
 ### 3. Fail-Closed Proxy Architecture

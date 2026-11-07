@@ -1,0 +1,21 @@
+# TLS termination for the torproxy management API (ISSUE-18a, #106).
+#
+# The container itself stays plain HTTP; Caddy terminates TLS and
+# forwards to torproxy on the internal Docker network. For a real
+# deployment replace the `:8443` bind with a public domain (Caddy
+# then provisions a trusted certificate automatically), restrict
+# access (IP allowlist / basic auth) and never publish the API
+# without authentication.
+
+:8443 {
+	tls internal
+
+	reverse_proxy torproxy:8080
+
+	encode zstd gzip
+
+	log {
+		output stdout
+		format json
+	}
+}
