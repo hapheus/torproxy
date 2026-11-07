@@ -56,10 +56,24 @@ fi
 echo "✅ No ESTABLISHED fail-closed bypass rule present."
 
 echo "=== 2. Transparent Tor Egress Verification ==="
-CLIENT_OUTPUT=$(docker run --rm --network "container:${GATEWAY_CONTAINER}" curlimages/curl:latest -sS --connect-timeout 15 --max-time 30 https://check.torproject.org/api/ip)
+# Retry like the other canary egress checks: a single attempt against
+# check.torproject.org over a freshly built circuit is flaky and
+# produced a false red in the daily canary (curl exit 55) although
+# the gateway itself was healthy.
+CLIENT_OUTPUT=""
+IS_TOR=""
+EXIT_IP=""
+for attempt in 1 2 3 4; do
+  echo "Transparent egress check attempt $attempt/4..."
+  CLIENT_OUTPUT=$(docker run --rm --network "container:${GATEWAY_CONTAINER}" curlimages/curl:latest -sS --connect-timeout 15 --max-time 30 --retry 2 --retry-all-errors https://check.torproject.org/api/ip 2>/dev/null || true)
+  IS_TOR=$(echo "$CLIENT_OUTPUT" | jq -r '.IsTor // empty' 2>/dev/null || true)
+  EXIT_IP=$(echo "$CLIENT_OUTPUT" | jq -r '.IP // empty' 2>/dev/null || true)
+  if [ "$IS_TOR" = "true" ] && [ -n "$EXIT_IP" ]; then
+    break
+  fi
+  sleep 3
+done
 echo "Client Response: $CLIENT_OUTPUT"
-IS_TOR=$(echo "$CLIENT_OUTPUT" | jq -r '.IsTor // empty')
-EXIT_IP=$(echo "$CLIENT_OUTPUT" | jq -r '.IP // empty')
 
 if [ "$IS_TOR" != "true" ]; then
   echo "❌ CRITICAL: Outgoing traffic was NOT identified as Tor egress!"
