@@ -24,13 +24,19 @@ permissions:
 jobs:
   verify-live:
     name: "Live Image Verification (Pre-Release Gate)"
-    uses: ./.github/workflows/live-image-verification.yml
-    with:
-      image_ref: "torproxy:smoke-test"
-      build_local: true
-      run_alerts: false
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run Live Image Verification
+        uses: ./.github/actions/live-verification
+        with:
+          image_ref: "torproxy:smoke-test"
+          build_local: "true"
+          run_alerts: "false"
 
   github-release:
     name: "Generate Changelog & Publish GitHub Release"

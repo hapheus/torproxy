@@ -1,6 +1,6 @@
 name: "Daily Live Image Verification"
 
-# ISSUE-117: drift detector only. The same reusable workflow already
+# ISSUE-117: drift detector only. The same composite action already
 # gates PRs, publish and release against a locally built image, so
 # this daily run verifies the *published* image against upstream
 # drift (GeoIP file growth, URL moves, Tor network outages) — it is
@@ -30,11 +30,17 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-    uses: ./.github/workflows/live-image-verification.yml
-    with:
-      image_ref: "hapheus/torproxy:${{ github.event.inputs.image_tag || 'latest' }}"
-      build_local: false
-      run_alerts: true
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run Live Image Verification
+        uses: ./.github/actions/live-verification
+        with:
+          image_ref: "hapheus/torproxy:${{ github.event.inputs.image_tag || 'latest' }}"
+          build_local: "false"
+          run_alerts: "true"

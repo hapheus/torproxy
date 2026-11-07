@@ -15,8 +15,12 @@ WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 
 def _curl_http_lines() -> list[str]:
     lines: list[str] = []
-    for workflow in ("pr-gate.yml", "live-image-verification.yml"):
-        for line in (WORKFLOWS / workflow).read_text(encoding="utf-8").splitlines():
+    paths = [
+        WORKFLOWS / "pr-gate.yml",
+        WORKFLOWS.parents[1] / ".github" / "actions" / "live-verification" / "action.yml",
+    ]
+    for path in paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
             if "curl" in line and "http" in line:
                 lines.append(line)
     return lines
@@ -39,12 +43,18 @@ def _read(name: str) -> str:
     return (WORKFLOWS / name).read_text(encoding="utf-8")
 
 
-def test_live_verification_is_a_reusable_workflow() -> None:
+def test_live_verification_is_a_composite_action() -> None:
     # ISSUE-117: the live check must run before publish/release, not
-    # only after it (daily workflow_run). A reusable workflow lets the
-    # PR gate, publish and daily canary share one implementation.
-    live = _read("live-image-verification.yml")
-    assert "workflow_call:" in live
+    # only after it (daily workflow_run). A composite action lets the
+    # PR gate, publish, release and daily canary share one
+    # implementation. (A reusable workflow was tried first, but
+    # relative reusable paths fail with startup_failure on
+    # pull_request events — GitHub resolves them against the merge
+    # commit — so the composite action is the reliable form.)
+    live = (
+        WORKFLOWS.parents[1] / ".github" / "actions" / "live-verification" / "action.yml"
+    ).read_text(encoding="utf-8")
+    assert "using: composite" in live
     assert "Verify GeoIP Database Availability & Auto-Update" in live
     # Upstream drift guard: HEAD sizes must fit the configured limits.
     assert "Content-Length" in live
@@ -54,30 +64,25 @@ def test_live_verification_is_a_reusable_workflow() -> None:
 def test_pr_gate_runs_live_verification_before_merge() -> None:
     pr_gate = _read("pr-gate.yml")
     assert "live-image-verification" in pr_gate
-    # Relative reusable paths fail on pull_request events (GitHub
-    # resolves them against the simulated merge commit), so the PR
-    # gate pins the reusable workflow to the PR head branch.
-    assert (
-        "hapheus/torproxy/.github/workflows/live-image-verification.yml@${{ github.head_ref }}"
-        in pr_gate
-    )
+    assert "uses: ./.github/actions/live-verification" in pr_gate
 
 
 def test_publish_waits_for_live_verification() -> None:
     publish = _read("publish-dockerhub.yml")
-    assert "./.github/workflows/live-image-verification.yml" in publish
+    assert "uses: ./.github/actions/live-verification" in publish
     assert "needs: verify-live" in publish or "needs: [verify-live]" in publish
 
 
 def test_release_waits_for_live_verification() -> None:
     release = _read("release.yml")
-    assert "./.github/workflows/live-image-verification.yml" in release
+    assert "uses: ./.github/actions/live-verification" in release
     assert "verify-live" in release
 
 
-def test_daily_canary_reuses_the_shared_workflow() -> None:
+def test_daily_canary_reuses_the_shared_action() -> None:
     daily = _read("daily-image-verification.yml")
     assert "schedule:" in daily
-    assert "./.github/workflows/live-image-verification.yml" in daily
+    assert "uses: ./.github/actions/live-verification" in daily
     # The daily run verifies the published image, it must not rebuild it.
-    assert "build_local" in daily
+    assert 'build_local: "false"' in daily
+    assert 'run_alerts: "true"' in daily
