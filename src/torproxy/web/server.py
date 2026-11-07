@@ -21,12 +21,28 @@ class RequestError(Exception):
         self.status = status
 
 
+SAFE_REQUEST_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.]{1,64}\Z")
+
+
+def sanitize_request_id(value: str) -> str:
+    """Return a header-safe correlation id (CodeQL-visible sanitizer).
+
+    Only ``[A-Za-z0-9_.-]{1,64}`` is accepted; anything else (including
+    CR/LF, which would enable HTTP response splitting) falls back to a
+    fresh UUID. This keeps the value safe for ``X-Request-ID`` headers
+    and for log lines.
+    """
+    if SAFE_REQUEST_ID_PATTERN.fullmatch(value):
+        return value
+    return str(uuid.uuid4())
+
+
 class APIHandler(BaseHTTPRequestHandler):
     server: "ProxyHTTPServer"
 
     MUTATION_PATHS = ("connect", "disconnect", "reconnect")
     LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
-    SAFE_REQUEST_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-.]{1,64}\Z")
+    SAFE_REQUEST_ID_PATTERN = SAFE_REQUEST_ID_PATTERN
 
     def _is_same_origin(self) -> bool:
         """CSRF guard for mutations: browser cross-origin requests carry Origin/Referer.
@@ -116,11 +132,8 @@ class APIHandler(BaseHTTPRequestHandler):
         started = time.monotonic()
         # ISSUE-14: correlation id echoed on every response and in logs.
         # Sanitize incoming header to safe characters to prevent HTTP response splitting.
-        candidate_rid = self.headers.get("X-Request-ID", "").strip()
-        if candidate_rid and self.SAFE_REQUEST_ID_PATTERN.fullmatch(candidate_rid):
-            self.request_id = candidate_rid
-        else:
-            self.request_id = str(uuid.uuid4())
+        request_id = sanitize_request_id(self.headers.get("X-Request-ID", "").strip())
+        self.request_id = request_id
         try:
             parsed = urllib.parse.urlsplit(self.path)
             clean_path = parsed.path.strip("/")
@@ -162,7 +175,7 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_response(response.status)
         self.send_header("Content-Type", response.content_type)
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("X-Request-ID", self.request_id)
+        self.send_header("X-Request-ID", request_id.replace("\r", "").replace("\n", ""))
         # Wildcard CORS only on successful, non-mutating responses (ISSUE-01):
         # never on errors and never on mutations, so foreign origins cannot read
         # or trigger state changes through a browser.

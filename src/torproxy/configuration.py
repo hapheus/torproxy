@@ -69,6 +69,12 @@ class Settings:
     gateway_mode: bool = False
     trans_port: int = 9040
     dns_port: int = 9053
+    geoip_auto_update: bool = False
+    geoip_update_interval: int = 86400
+    geoip_dir: str = "/var/lib/tor/geoip"
+    geoip_url: str = "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip"
+    geoip6_url: str = "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6"
+    geoip_max_bytes: int = 10 * 1024 * 1024
 
     def __post_init__(self) -> None:
         try:
@@ -108,6 +114,18 @@ class Settings:
             raise ValueError("Request limits must be positive")
         if self.exit_nodes and not re.fullmatch(r"[a-zA-Z0-9{},.$~= /:-]+", self.exit_nodes):
             raise ValueError("Invalid TORPROXY_EXIT_NODES")
+        if self.geoip_update_interval < 1:
+            raise ValueError("TORPROXY_GEOIP_UPDATE_INTERVAL must be a positive integer")
+        if self.geoip_max_bytes < 1:
+            raise ValueError("TORPROXY_GEOIP_MAX_BYTES must be a positive integer")
+        if not self.geoip_dir.startswith("/"):
+            raise ValueError("TORPROXY_GEOIP_DIR must be an absolute path")
+        for name, url in (
+            ("TORPROXY_GEOIP_URL", self.geoip_url),
+            ("TORPROXY_GEOIP6_URL", self.geoip6_url),
+        ):
+            if not url.startswith("https://"):
+                raise ValueError(f"{name} must be an https:// URL")
 
     @classmethod
     def from_mapping(cls, env: Mapping[str, str]) -> "Settings":
@@ -136,6 +154,12 @@ class Settings:
 
         raw_gw = env.get("TORPROXY_GATEWAY_MODE", "0").strip().lower()
         gateway_mode = raw_gw in ("1", "true", "yes")
+
+        geoip_auto, error = validate_strict_nodes_input(
+            env.get("TORPROXY_GEOIP_AUTO_UPDATE") or None
+        )
+        if error:
+            raise ValueError(f"TORPROXY_GEOIP_AUTO_UPDATE: {error}")
 
         def _float(name: str, default: float) -> float:
             try:
@@ -172,14 +196,35 @@ class Settings:
             gateway_mode=gateway_mode,
             trans_port=port("TORPROXY_TRANS_PORT", 9040),
             dns_port=port("TORPROXY_DNS_PORT", 9053),
+            geoip_auto_update=geoip_auto if geoip_auto is not None else False,
+            geoip_update_interval=_int_setting("TORPROXY_GEOIP_UPDATE_INTERVAL", 86400),
+            geoip_dir=env.get("TORPROXY_GEOIP_DIR", "/var/lib/tor/geoip"),
+            geoip_url=env.get(
+                "TORPROXY_GEOIP_URL",
+                "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip",
+            ),
+            geoip6_url=env.get(
+                "TORPROXY_GEOIP6_URL",
+                "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6",
+            ),
+            geoip_max_bytes=_int_setting("TORPROXY_GEOIP_MAX_BYTES", 10 * 1024 * 1024),
         )
 
 
-def render_torrc(settings: Settings, template: str) -> str:
+def render_torrc(settings: Settings, template: str, geoip_active: bool = False) -> str:
     result = template.replace("__TORPROXY_SOCKS_PORT__", str(settings.socks_port))
     result = result.replace(
         "ControlPort 127.0.0.1:9051", f"ControlPort 127.0.0.1:{settings.control_port}"
     )
+    if geoip_active:
+        result = result.replace(
+            "GeoIPFile /usr/share/tor/geoip",
+            f"GeoIPFile {settings.geoip_dir}/geoip",
+        )
+        result = result.replace(
+            "GeoIPv6File /usr/share/tor/geoip6",
+            f"GeoIPv6File {settings.geoip_dir}/geoip6",
+        )
     if settings.gateway_mode:
         result += f"\nTransPort 127.0.0.1:{settings.trans_port}\n"
         result += f"DNSPort 127.0.0.1:{settings.dns_port}\n"

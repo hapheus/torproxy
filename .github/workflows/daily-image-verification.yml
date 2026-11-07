@@ -307,6 +307,61 @@ jobs:
           docker rm -f torproxy-canary-gateway
 
       # -------------------------------------------------------------
+      # 6c. GeoIP database availability + auto-update verification
+      # -------------------------------------------------------------
+      - name: Verify GeoIP Database Availability & Auto-Update
+        run: |
+          echo "Checking upstream GeoIP URLs are reachable..."
+          GEOIP_URL="https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip"
+          GEOIP6_URL="https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6"
+          curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null "$GEOIP_URL" || { echo "❌ GeoIP (IPv4) upstream unavailable: $GEOIP_URL"; exit 1; }
+          curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null "$GEOIP6_URL" || { echo "❌ GeoIP (IPv6) upstream unavailable: $GEOIP6_URL"; exit 1; }
+          echo "✅ GeoIP upstream URLs reachable"
+
+          IMAGE_TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          IMAGE_NAME="hapheus/torproxy:${IMAGE_TAG}"
+          echo "Starting torproxy with GeoIP auto-update + country routing..."
+          docker run -d \
+            --name torproxy-canary-geoip \
+            -e TORPROXY_GEOIP_AUTO_UPDATE=1 \
+            -e TORPROXY_COUNTRY=DE \
+            -p 8087:8080 \
+            "$IMAGE_NAME"
+
+          echo "Waiting for GeoIP files to be downloaded inside container..."
+          GEOIP_OK=false
+          for i in $(seq 1 30); do
+            if docker exec torproxy-canary-geoip sh -c 'test -s /var/lib/tor/geoip/geoip && test -s /var/lib/tor/geoip/geoip6'; then
+              GEOIP_OK=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$GEOIP_OK" != "true" ]; then
+            echo "❌ GeoIP auto-update did not download databases inside container"
+            docker logs torproxy-canary-geoip || true
+            exit 1
+          fi
+          echo "✅ GeoIP databases downloaded inside container"
+
+          echo "Waiting for Tor bootstrap with downloaded GeoIP DB..."
+          BOOTSTRAPPED=false
+          for i in $(seq 1 36); do
+            STATUS=$(curl -s --connect-timeout 5 --max-time 5 http://localhost:8087/status | jq -r '.status // empty' || true)
+            if [ "$STATUS" = "connected" ]; then
+              BOOTSTRAPPED=true
+              echo "✅ Tor connected with downloaded GeoIP DB"
+              break
+            fi
+            sleep 5
+          done
+          if [ "$BOOTSTRAPPED" != "true" ]; then
+            echo "❌ Tor failed to bootstrap with GeoIP auto-update enabled"
+            exit 1
+          fi
+          docker rm -f torproxy-canary-geoip
+
+      # -------------------------------------------------------------
       # 7. Generate Step Summary
       # -------------------------------------------------------------
       - name: Generate Step Summary
@@ -337,8 +392,8 @@ jobs:
         if: always()
         run: |
           echo "Stopping and cleaning up container..."
-          docker stop torproxy-canary torproxy-canary-gateway || true
-          docker rm torproxy-canary torproxy-canary-gateway || true
+          docker stop torproxy-canary torproxy-canary-gateway torproxy-canary-geoip || true
+          docker rm torproxy-canary torproxy-canary-gateway torproxy-canary-geoip || true
 
       # -------------------------------------------------------------
       # 9. Failure Notification: create or update Issue

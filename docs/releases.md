@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.3.0 (GeoIP auto-update)
+
+- **Optional periodic GeoIP auto-update (ISSUE-20, #102):** new opt-in `TORPROXY_GEOIP_AUTO_UPDATE=1` downloads Tor's `geoip`/`geoip6` from Tor Project GitLab over HTTPS at startup and every `TORPROXY_GEOIP_UPDATE_INTERVAL` seconds (default 24h), validates the format, installs atomically into `TORPROXY_GEOIP_DIR`, and sends Tor `SIGHUP` to reload. On any failure the bundled or previously installed database keeps working. Default stays disabled (backward compatible). The Daily Live Image Verification workflow now checks daily that the GeoIP upstream URLs are reachable and that a container with auto-update downloads the database.
+
 ### 2.2.0 (P0/P1 robustness sprint)
 
 - **Egress check decoupling (ISSUE-06, #70):** `TorEgressProbe` retries with backoff, trips a circuit breaker after repeated failures and returns distinct reasons (`egress check service unreachable` vs. `IsTor=false`). `/health` reports `degraded` with a reason when Tor/SOCKS are up but the check fails. The Docker healthcheck is loopback-only — no external domain call (`config.privoxy.org` removed).

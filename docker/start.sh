@@ -7,8 +7,8 @@ validate_configuration() {
 
 shutdown() {
   echo "[start.sh] Shutting down child processes (Tor, Privoxy, API)..." >&2
-  kill -TERM "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" 2>/dev/null || true
-  wait "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" 2>/dev/null || true
+  kill -TERM "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" "${geoip_pid:-}" 2>/dev/null || true
+  wait "${tor_pid:-}" "${privoxy_pid:-}" "${api_pid:-}" "${geoip_pid:-}" 2>/dev/null || true
 }
 
 trap shutdown SIGTERM SIGINT EXIT
@@ -41,6 +41,13 @@ privoxy_pid=$!
 
 su torproxy -s /bin/sh -c 'exec python3 -m torproxy' &
 api_pid=$!
+
+# ISSUE-20: optional periodic GeoIP refresh (opt-in, fallback-safe).
+geoip_pid=""
+if [ "${TORPROXY_GEOIP_AUTO_UPDATE:-0}" = "1" ] || [ "${TORPROXY_GEOIP_AUTO_UPDATE:-}" = "true" ] || [ "${TORPROXY_GEOIP_AUTO_UPDATE:-}" = "yes" ]; then
+  python3 -m torproxy.runtime.geoip --loop &
+  geoip_pid=$!
+fi
 
 # Exit as soon as any critical process exits. tini forwards signals and
 # terminates the remaining process group during container shutdown.
