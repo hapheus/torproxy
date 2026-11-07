@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.4.0 (Probe diagnosis & Privoxy ADR)
+
+- **Egress probe failure taxonomy (ISSUE-12, #76, PR #104):** `TorEgressProbe` now distinguishes `local HTTP proxy unreachable` (connection refused on `127.0.0.1:8118`, e.g. Privoxy down while SOCKS5/Tor may be healthy), `Tor upstream unavailable via local HTTP proxy (HTTP 5xx)` (proxy answered 5xx, no Tor circuit ready), `egress check service returned HTTP 4xx` (check service answered, e.g. 429 rate-limit — not a Tor failure), and `egress check service unreachable`. An open circuit breaker keeps the original cause. Error strings are stable and leak-free; `status` values and JSON shapes are unchanged.
+- **Privoxy ADR (`docs/adr-privoxy-http-proxy.md`):** evaluation of Privoxy vs. `HTTPTunnelPort`/`tinyproxy` — decision is to **keep Privoxy on port 8118 for now**; a replacement requires a prototype passing plain HTTP, CONNECT, remote-DNS leak, fail-closed and IPv6 tests. No new dependency for a SOCKS5-native probe (`urllib` has no SOCKS support).
+
 ### 2.3.0 (GeoIP auto-update)
 
 - **Optional periodic GeoIP auto-update (ISSUE-20, #102):** new opt-in `TORPROXY_GEOIP_AUTO_UPDATE=1` downloads Tor's `geoip`/`geoip6` from Tor Project GitLab over HTTPS at startup and every `TORPROXY_GEOIP_UPDATE_INTERVAL` seconds (default 24h), validates the format, installs atomically into `TORPROXY_GEOIP_DIR`, and sends Tor `SIGHUP` to reload. On any failure the bundled or previously installed database keeps working. Default stays disabled (backward compatible). The Daily Live Image Verification workflow now checks daily that the GeoIP upstream URLs are reachable and that a container with auto-update downloads the database.
