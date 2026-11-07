@@ -9,8 +9,13 @@ class TorControlError(Exception):
     """Raised when an unrecoverable protocol or socket error occurs."""
 
 
-def _read_raw_line(sock: socket.socket, buffer: bytes) -> tuple[str, bytes]:
-    """Reads characters from buffer or socket until CRLF or LF is encountered."""
+def _read_raw_line(sock: socket.socket, buffer: bytes, limit: int = 262144) -> tuple[str, bytes]:
+    """Reads characters from buffer or socket until CRLF or LF is encountered.
+
+    ISSUE-09: the buffer is bounded *before* the next recv, so a peer
+    without line terminators cannot grow memory unboundedly before the
+    size check fires.
+    """
     while True:
         if b"\r\n" in buffer:
             line_bytes, buffer = buffer.split(b"\r\n", 1)
@@ -19,7 +24,7 @@ def _read_raw_line(sock: socket.socket, buffer: bytes) -> tuple[str, bytes]:
             line_bytes, buffer = buffer.split(b"\n", 1)
             return line_bytes.decode("utf-8", errors="replace"), buffer
 
-        if len(buffer) > 65536:
+        if len(buffer) > limit:
             raise TorControlError("Tor control line exceeds size limit")
         chunk = sock.recv(1024)
         if not chunk:
@@ -60,14 +65,17 @@ def read_reply(sock: socket.socket) -> tuple[int, list[str]]:
             # Multiline continuation
             continue
         elif separator == "+":
-            # Multiline data block ending with a single '.' on its own line
+            # Multiline data block ending with a single '.' on its own line.
+            # ISSUE-09: the size limit is checked BEFORE appending — a
+            # single oversized data line is rejected without growing
+            # ``lines`` (DoS amplifier fix).
             while True:
                 data_line, buffer = _read_raw_line(sock, buffer)
                 if data_line == ".":
                     break
-                total_bytes += len(data_line) + 2
-                if total_bytes > 262144:
+                if total_bytes + len(data_line) + 2 > 262144:
                     raise TorControlError("Tor control reply exceeds size limit")
+                total_bytes += len(data_line) + 2
                 lines.append(data_line)
         else:
             raise TorControlError(f"Unrecognized separator in Tor control reply: {line!r}")
@@ -76,12 +84,16 @@ def read_reply(sock: socket.socket) -> tuple[int, list[str]]:
 
 
 def authenticate(sock: socket.socket, cookie_path: str | None = None) -> tuple[bool, str | None]:
-    """Authenticates with the Tor control port using a mandatory 32-byte cookie."""
+    """Authenticates with the Tor control port using a mandatory 32-byte cookie.
+
+    ISSUE-09: exactly 32 bytes are consumed. A cookie file with a trailing
+    newline (33 bytes on disk) is accepted — only the first 32 bytes matter.
+    """
     target_cookie = cookie_path or DEFAULT_COOKIE_PATH
 
     try:
         with open(target_cookie, "rb") as cookie:
-            cookie_data = cookie.read(33)
+            cookie_data = cookie.read(32)
         if len(cookie_data) != 32:
             return False, "Tor control authentication requires a 32-byte cookie"
     except OSError:
@@ -129,8 +141,12 @@ def send_command(
 
             reply_text = "\r\n".join(lines) + "\r\n"
             return reply_text, None
-    except Exception as e:  # noqa: BLE001
-        return None, str(e)
+    except (OSError, TorControlError, TimeoutError):
+        # ISSUE-08: never leak raw socket text ([Errno ...], paths) to
+        # API clients. Return a stable, sanitized error code instead.
+        return None, "Tor control unavailable"
+    except Exception:  # noqa: BLE001
+        return None, "Tor control unavailable"
 
 
 class TorControlClient:

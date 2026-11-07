@@ -76,6 +76,36 @@ services:
 2. **Fail-Closed Kill Switch**: If Tor is bootstrapping, disconnected, or terminates, direct outbound traffic is blocked by `iptables` reject rules.
 3. **UDP Isolation**: Because Tor does not support arbitrary UDP, unsupported outbound UDP is blocked with ICMP port-unreachable to trigger immediate fallback to TCP (e.g. for HTTP/3 / QUIC).
 4. **Non-Root Execution**: The container init runs as root only to drop privileges — every daemon runs as an unprivileged user (`tor`, `privoxy`, `torproxy`). The gateway kill switch scopes the WAN bypass to the dedicated `tor` UID.
+5. **iptables backend (ISSUE-13)**: `check_net_admin_capability` requires a working `iptables` plus an nft or legacy backend binary (`xtables-nft-multi` / `xtables-legacy-multi`). Alpine package renames that drop the multi-binary will fail fast at startup instead of silently leaving the gateway unprotected. `iptables_backend()` reports the active backend (`nft` / `legacy`) for diagnostics.
+
+---
+
+## Docker DNS interaction & `FORWARD DROP` (ISSUE-13)
+
+The gateway installs `iptables -A FORWARD -j DROP` as part of the fail-closed
+kill switch (IPv6: policy `FORWARD DROP`). This has two practical consequences
+you must plan for:
+
+* **Embedded Docker DNS (`127.0.0.11`)**: containers sharing the `torproxy`
+  network namespace via `network_mode: "service:torproxy"` resolve names through
+  the embedded DNS *before* traffic is forwarded. The `FORWARD DROP` rule drops
+  forwarded packets, it does not break name resolution *inside* the shared
+  namespace. But bridge-level forwarding to *another* Compose network or to a
+  host-published port that relies on the Docker bridge `FORWARD` chain will be
+  dropped — expose the gateway ports directly on the `torproxy` service
+  (`ports:` on `torproxy`, not on the client container) and use
+  `depends_on: condition: service_healthy`.
+* **Bridge setups**: if you route traffic through a user-defined bridge and
+  expect `FORWARD` to carry it to a sidecar, add an explicit `ACCEPT` for your
+  subnet *after* the gateway rules are installed — or keep the setup entirely
+  inside the shared namespace (recommended). The default posture is intentionally
+  fail-closed; see `src/torproxy/runtime/gateway.py:generate_iptables_rules`.
+
+Verify the documented setup with:
+
+```bash
+docker compose up -d && ./verify_gateway.sh
+```
 
 ---
 

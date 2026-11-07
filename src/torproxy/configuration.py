@@ -137,6 +137,18 @@ class Settings:
         raw_gw = env.get("TORPROXY_GATEWAY_MODE", "0").strip().lower()
         gateway_mode = raw_gw in ("1", "true", "yes")
 
+        def _float(name: str, default: float) -> float:
+            try:
+                return float(env.get(name, str(default)))
+            except ValueError:
+                raise ValueError(f"{name} must be a number") from None
+
+        def _int_setting(name: str, default: int) -> int:
+            try:
+                return int(env.get(name, str(default)))
+            except ValueError:
+                raise ValueError(f"{name} must be an integer") from None
+
         return cls(
             listen_address=env.get("TORPROXY_LISTEN_ADDRESS", "0.0.0.0"),
             proxy_port=port("TORPROXY_LISTEN_PORT", 8118),
@@ -150,6 +162,10 @@ class Settings:
             # TORPROXY_STRICT_NODES=1. Setting a country/exit nodes alone
             # must never implicitly refuse circuits (documented default 0).
             strict_nodes=strict if strict is not None else False,
+            cache_ttl=_float("TORPROXY_CACHE_TTL", 30),
+            request_timeout=_float("TORPROXY_REQUEST_TIMEOUT", 3),
+            max_body_bytes=_int_setting("TORPROXY_MAX_BODY_BYTES", 16384),
+            max_workers=_int_setting("TORPROXY_MAX_WORKERS", 32),
             api_token=api_token,
             api_allow_anonymous_health=api_allow_anonymous_health,
             api_listen_address=api_listen_address,

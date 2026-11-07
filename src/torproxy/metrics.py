@@ -10,8 +10,14 @@ def render_metrics(
     bootstrap: Mapping | None,
     socks: bool,
     gateway_mode: bool = False,
+    *,
+    requests_total: int = 0,
+    requests_rejected_total: int = 0,
+    http_4xx_total: int = 0,
+    http_5xx_total: int = 0,
+    latency_total_seconds: float = 0.0,
 ) -> str:
-    values = (
+    values: list[tuple[str, str, str, object]] = [
         (
             "uptime_seconds",
             "Total container API uptime in seconds",
@@ -50,7 +56,34 @@ def render_metrics(
             int(snapshot.strict_nodes),
         ),
         ("exit_country_info", "Configured exit country code", "gauge", 1),
-    )
+        # ISSUE-11 / ISSUE-14: overload rejections and HTTP observability.
+        (
+            "requests_rejected_total",
+            "Requests rejected due to worker saturation (503)",
+            "counter",
+            requests_rejected_total,
+        ),
+        (
+            "http_requests_total",
+            "Total HTTP requests handled",
+            "counter",
+            requests_total,
+        ),
+        ("http_4xx_total", "Total HTTP 4xx responses", "counter", http_4xx_total),
+        ("http_5xx_total", "Total HTTP 5xx responses", "counter", http_5xx_total),
+        (
+            "http_latency_seconds_total",
+            "Total HTTP request latency in seconds",
+            "counter",
+            round(latency_total_seconds, 4),
+        ),
+        (
+            "http_latency_seconds_count",
+            "Total HTTP request latency observations",
+            "counter",
+            requests_total,
+        ),
+    ]
     country = (
         (snapshot.country or "").replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
     )

@@ -53,7 +53,9 @@ class TestTorControlProtocol:
         resp, err = api.send_tor_command("GETCONF DisableNetwork")
 
         assert resp is None
-        assert "timed out" in err
+        # ISSUE-08: leak-free error
+        assert err == "Tor control unavailable"
+        assert "timed out" not in err
 
 
 @pytest.mark.unit
@@ -210,7 +212,8 @@ class TestIPResolutionAndCaching:
         ip, err = api.get_current_ip()
 
         assert ip is None
-        assert "verification failed" in err
+        # ISSUE-06: distinct reason for an unreachable check service
+        assert "unreachable" in err
 
 
 @pytest.mark.unit
