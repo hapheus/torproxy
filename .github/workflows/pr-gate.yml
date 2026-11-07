@@ -251,8 +251,10 @@ jobs:
             torproxy:smoke-test)
           # Wait until the API responds (privilege drop + cookie fixup take
           # a few seconds under the hardened capability profile).
+          # Every poll is bounded so a hung attempt cannot block the step
+          # until the OS TCP timeout (ISSUE-19).
           for i in $(seq 1 30); do
-            curl -fsS http://localhost:8081/status >/dev/null 2>&1 && break
+            curl -fsS --connect-timeout 2 --max-time 5 http://localhost:8081/status >/dev/null 2>&1 && break
             sleep 2
           done
           ./tests/integration/verify_container.sh "$HARDENED_ID" 8081 8119 9051
@@ -270,15 +272,29 @@ jobs:
             torproxy:smoke-test)
           sleep 5
           chmod +x tests/integration/verify_gateway.sh
-          # Wait up to 60s for Tor bootstrap
-          for i in {1..12}; do
-            STATUS=$(curl -s http://127.0.0.1:8085/status | jq -r '.status // empty' || true)
+          # Wait for Tor bootstrap, polling over loopback inside the
+          # container. The published host port goes through the gateway
+          # kill switch, so a host-side curl without a timeout can block
+          # until the OS TCP timeout (~127s per attempt) and stretch a
+          # nominal 60s wait to ~28 minutes (ISSUE-19). Every poll here
+          # is bounded and the whole wait is capped at 180s.
+          BOOTSTRAPPED=false
+          START=$SECONDS
+          while [ $((SECONDS - START)) -lt 180 ]; do
+            STATUS=$(docker exec torproxy-gateway-smoke curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/status 2>/dev/null | jq -r '.status // empty' || true)
             if [ "$STATUS" = "connected" ]; then
               echo "✅ Gateway container bootstrapped!"
+              BOOTSTRAPPED=true
               break
             fi
             sleep 5
           done
+          if [ "$BOOTSTRAPPED" != "true" ]; then
+            echo "❌ Gateway container did not bootstrap within 180s; container logs:"
+            docker logs torproxy-gateway-smoke || true
+            docker rm -f "$GW_ID" || true
+            exit 1
+          fi
           ./tests/integration/verify_gateway.sh torproxy-gateway-smoke
           docker rm -f "$GW_ID"
           echo "✅ Gateway Mode verified."
@@ -290,13 +306,13 @@ jobs:
           docker run -d --name torproxy-prev -p 8120:8118 -p 8082:8080 hapheus/torproxy:latest || true
           sleep 5
           if [ "$(docker ps -q -f name=torproxy-prev)" ]; then
-            curl -s http://127.0.0.1:8082/status || true
+            curl -s --connect-timeout 2 --max-time 5 http://127.0.0.1:8082/status || true
             docker rm -f torproxy-prev
           fi
           # Test running candidate image on the exact same port mapping
           docker run -d --name torproxy-upgrade -p 8120:8118 -p 8082:8080 torproxy:smoke-test
           sleep 5
-          curl -s http://127.0.0.1:8082/status | grep -q "status"
+          curl -s --connect-timeout 2 --max-time 5 http://127.0.0.1:8082/status | grep -q "status"
           docker rm -f torproxy-upgrade
           echo "✅ Upgrade compatibility verified."
 
