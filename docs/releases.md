@@ -91,6 +91,16 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.2.0 (P0/P1 robustness sprint)
+
+- **Egress check decoupling (ISSUE-06, #70):** `TorEgressProbe` retries with backoff, trips a circuit breaker after repeated failures and returns distinct reasons (`egress check service unreachable` vs. `IsTor=false`). `/health` reports `degraded` with a reason when Tor/SOCKS are up but the check fails. The Docker healthcheck is loopback-only — no external domain call (`config.privoxy.org` removed).
+- **ControlPort sanitization (ISSUE-08, #72):** socket failures map to the stable error `Tor control unavailable`; raw `[Errno ...]`/paths never reach API clients. ADR `docs/adr-tor-control-port.md`: one-shot client stays.
+- **Parser hardening (ISSUE-09, #73):** `read_reply` checks the size limit before appending in `+` data blocks and bounds the line buffer before `recv`; `authenticate` reads exactly 32 bytes (trailing-newline cookies accepted).
+- **Cache correctness & tuning (ISSUE-10, #74):** single-flight for egress probes (20 parallel `/ip` → 1 upstream call), additive `stale` field in `/health` egress, and new env vars `TORPROXY_CACHE_TTL`, `TORPROXY_REQUEST_TIMEOUT`, `TORPROXY_MAX_WORKERS`, `TORPROXY_MAX_BODY_BYTES` (defaults unchanged).
+- **Worker overload visibility (ISSUE-11, #75):** saturation now returns `503` + `Retry-After` (instead of a silent TCP reset) and increments `torproxy_requests_rejected_total`.
+- **Gateway operations (ISSUE-13, #77):** `check_net_admin_capability` evaluates nft/legacy backend binaries (`iptables_backend()` helper); `FORWARD DROP` + Docker embedded DNS (`127.0.0.11`) interaction documented in `examples/transparent-tor-gateway/README.md`.
+- **API observability & privacy (ISSUE-14, #78):** anonymous `/health` returns a minimal `{status}` body, every response carries `X-Request-ID`, and `/metrics` gains `http_requests_total`, `http_4xx_total`, `http_5xx_total`, `http_latency_seconds_total/count` and `requests_rejected_total`. Wildcard CORS stays on successful non-mutating reads only.
+
 ### 2.1.1 (Python/toolchain alignment)
 
 - **Python/toolchain drift fixed (ISSUE-15, #79):** the image interpreter is pinned to Python 3.14 (`ARG PYTHON_VERSION` + `apk add python3~3.14`) with a fail-fast build-time version assert; `torproxy` is installed into the `sysconfig`-derived `site-packages` instead of the Debian-specific `dist-packages` path (no `PYTHONPATH` needed); the hermetic CI matrix now covers 3.10 (declared minimum), 3.11, and 3.14; the image build logs the Python version and runs an import self-test. No application behavior changed. Original approach contributed by @Joffy-Maria (#93).

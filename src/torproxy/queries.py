@@ -79,11 +79,15 @@ class ProxyQueries:
             "exit_country": snapshot.country,
             "strict_nodes": snapshot.strict_nodes,
         }
+        # ISSUE-10: additive `stale` signal; ISSUE-06: never claim healthy
+        # when the egress check itself failed — report `degraded` with a
+        # reason instead of a misleading "connecting".
+        stale = self.service.cache_is_stale()
         body: dict[str, Any] = {
             "status": "disconnected",
             "tor": tor,
             "proxies": {"socks5": False},
-            "egress": {"verified": False, "ip": None},
+            "egress": {"verified": False, "ip": None, "stale": stale},
         }
         if not enabled:
             return Response(200, body)
@@ -100,9 +104,22 @@ class ProxyQueries:
             )
             return Response(200, body)
         ip, error = self.service.get_current_ip()
-        body["status"] = "healthy" if ip and socks else "degraded"
         tor.update(bootstrapped=True, progress=100, summary="Done")
-        body["egress"].update(verified=bool(ip), ip=ip, error=error if not ip else None)
+        if ip and socks:
+            body["status"] = "healthy"
+            body["egress"].update(
+                verified=True, ip=ip, error=None, stale=self.service.cache_is_stale()
+            )
+        else:
+            # Tor is up but egress verification failed (e.g. check.torproject.org
+            # unreachable): degraded, not "connecting"/"healthy".
+            body["status"] = "degraded"
+            body["egress"].update(
+                verified=False,
+                ip=ip,
+                error=error or "egress verification failed",
+                stale=stale,
+            )
         return Response(200, body)
 
     def diagnostics(self) -> Response:

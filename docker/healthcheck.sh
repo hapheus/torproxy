@@ -1,14 +1,16 @@
 #!/bin/sh
 set -eu
 
-# 1. Verify that Privoxy accepts and processes a local proxy request.
-# config.privoxy.org may return an HTTP error when its templates are not
-# available beside the runtime-generated config, so only test connectivity.
-# This generates zero external network traffic.
-curl --silent --show-error --output /dev/null \
-  --proxy "http://127.0.0.1:${TORPROXY_LISTEN_PORT}" \
+# ISSUE-06: the healthcheck must not depend on any external domain.
+# `config.privoxy.org` was removed: an external outage/rate-limit must not
+# mark a healthy Tor container unhealthy. Both probes below are loopback-only.
+
+# 1. Verify that Privoxy accepts a TCP connection on loopback.
+# Pure loopback probe: no external network traffic, no DNS resolution.
+curl --silent --show-error --connect-only \
   --connect-timeout 2 --max-time 5 \
-  http://config.privoxy.org/
+  "http://127.0.0.1:${TORPROXY_LISTEN_PORT}/" \
+  >/dev/null 2>&1 || exit 1
 
 # 2. Check if the local REST API is responding with a 'connected' status.
 AUTH_HEADER=""

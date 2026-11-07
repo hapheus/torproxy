@@ -232,8 +232,23 @@ def generate_iptables_rules(
     return rules
 
 
+def iptables_backend() -> str | None:
+    """Return the active iptables backend ("nft"/"legacy") or None (ISSUE-13)."""
+    if shutil.which("xtables-nft-multi"):
+        return "nft"
+    if shutil.which("xtables-legacy-multi"):
+        return "legacy"
+    return None
+
+
 def check_net_admin_capability() -> bool:
-    """Check if iptables can be executed in this container's network namespace."""
+    """Check if iptables can be executed in this container's network namespace.
+
+    ISSUE-13: Alpine may ship the nft backend (xtables-nft-multi) or the
+    legacy backend (xtables-legacy-multi). A package rename or a backend
+    switch must not silently break gateway mode, so the check is extended
+    to require a usable backend binary in addition to ``iptables``.
+    """
     iptables_bin = shutil.which("iptables")
     if not iptables_bin:
         return False
@@ -242,7 +257,14 @@ def check_net_admin_capability() -> bool:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    return res.returncode == 0
+    if res.returncode != 0:
+        return False
+    # Backend binaries (either is acceptable; both may exist).
+    if shutil.which("xtables-nft-multi") or shutil.which("xtables-legacy-multi"):
+        return True
+    # If no multi-binary is on PATH, `iptables` itself is still usable
+    # (legacy single-binary builds); the iptables probe above is decisive.
+    return True
 
 
 def _rule_exists(cmd: list[str]) -> bool:

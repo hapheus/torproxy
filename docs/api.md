@@ -14,7 +14,8 @@ The `torproxy` container includes an internal REST API server written in Python.
   - `Authorization: Bearer <token>`
   - `X-API-Key: <token>`
   Unauthenticated or invalid requests receive `401 Unauthorized` with `WWW-Authenticate: Bearer realm="torproxy"`.
-  When `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH=1` is enabled, `/health` (and `/v1/health`) allows unauthenticated probing for orchestrators while protecting all other endpoints.
+  When `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH=1` is enabled, `/health` (and `/v1/health`) allows unauthenticated probing for orchestrators while protecting all other endpoints. Anonymous health responses are minimal (ISSUE-14): only `{"status": "..."}` — country, ports and bootstrap details require authentication.
+- **Correlation:** Every response carries `X-Request-ID` (echoed if sent by the client, otherwise generated). The server log includes the same ID with all paths redacted.
 - **Method Policy:** Both `GET` and `POST` methods are accepted by all endpoints. `POST` is recommended for state mutations (`/connect`, `/disconnect`, `/reconnect`), but `GET` is permanently preserved for backward compatibility. Mutations carrying a foreign browser `Origin`/`Referer` are rejected with `403 Forbidden` (CSRF protection); mutations without those headers (curl, scripts) keep working unchanged.
 
 ---
@@ -187,10 +188,17 @@ Additive diagnostic endpoint providing detailed readiness and component states w
   "egress": {
     "verified": true,
     "ip": "185.220.101.5",
-    "error": null
+    "error": null,
+    "stale": false
   }
 }
 ```
+
+### IP Caching Semantics
+
+- **Time-to-Live (TTL):** 30 seconds by default, tunable via `TORPROXY_CACHE_TTL`.
+- **Single-flight (ISSUE-10):** concurrent `/ip`/`/status` calls share one upstream probe instead of stampeding the check service.
+- **Stale signal:** `/health` includes `egress.stale`; when Tor is bootstrapped but egress verification fails, `/health` reports `degraded` with the reason.
 
 ---
 

@@ -30,6 +30,14 @@ class RuntimeState:
         self.cached_ip: str | None = None
         self.cached_at = 0.0
         self.generation = 0
+        # ISSUE-14/11: HTTP observability counters (updated by the web
+        # transport, rendered by metrics). Kept here so the transport
+        # does not share state across server instances via globals.
+        self.requests_total = 0
+        self.requests_rejected_total = 0
+        self.http_4xx_total = 0
+        self.http_5xx_total = 0
+        self.request_latency_seconds_total = 0.0
 
     def invalidate(self) -> None:
         with self.lock:
@@ -47,3 +55,9 @@ class RuntimeState:
                 self.started_at,
                 max(0, self.clock.monotonic() - self.started_monotonic),
             )
+
+    def cache_age(self) -> float:
+        with self.lock:
+            if self.cached_ip is None:
+                return 0.0
+            return max(0.0, self.clock.monotonic() - self.cached_at)

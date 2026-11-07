@@ -1,6 +1,7 @@
 """Application operations; mutations are serialized and do not depend on HTTP."""
 
 import re
+import threading
 from typing import Any
 
 from torproxy.configuration import Settings, validate_country_input, validate_strict_nodes_input
@@ -31,24 +32,53 @@ class ProxyService:
         self.egress = egress
         self.socks = socks
         self.state = state
+        # ISSUE-10: single-flight for egress probes. The flag is only set
+        # while one probe is in flight; concurrent callers wait on it
+        # rather than each firing an upstream request (thundering herd).
+        # The lock is never held during network I/O itself.
+        self._egress_flight = threading.Lock()
 
     def send_tor_command(self, command: str) -> CommandResult:
         return self.control.send(command)
 
-    def get_current_ip(self) -> CommandResult:
+    def _cache_fresh(self) -> bool:
         with self.state.lock:
-            generation = self.state.generation
+            if not self.state.cached_ip:
+                return False
             age = self.state.clock.monotonic() - self.state.cached_at
-            if self.state.cached_ip and age < self.settings.cache_ttl:
+            return age < self.settings.cache_ttl
+
+    def get_current_ip(self) -> CommandResult:
+        if self._cache_fresh():
+            with self.state.lock:
                 return self.state.cached_ip, None
-        ip, error = self.egress.resolve()
+        # Single-flight: only one thread probes upstream at a time.
+        with self._egress_flight:
+            # Re-check after acquiring — another thread may have probed.
+            if self._cache_fresh():
+                with self.state.lock:
+                    return self.state.cached_ip, None
+            with self.state.lock:
+                generation = self.state.generation
+            ip, error = self.egress.resolve()
+            with self.state.lock:
+                if generation != self.state.generation:
+                    return None, "Proxy state changed during egress verification"
+                if ip:
+                    self.state.cached_ip = ip
+                    self.state.cached_at = self.state.clock.monotonic()
+            return ip, error
+
+    def cache_is_stale(self) -> bool:
+        """True when a cached egress IP exists but exceeds the TTL."""
         with self.state.lock:
-            if generation != self.state.generation:
-                return None, "Proxy state changed during egress verification"
-            if ip:
-                self.state.cached_ip = ip
-                self.state.cached_at = self.state.clock.monotonic()
-        return ip, error
+            if not self.state.cached_ip:
+                return False
+            age = self.state.clock.monotonic() - self.state.cached_at
+            return age >= self.settings.cache_ttl
+
+    def cache_age(self) -> float:
+        return self.state.cache_age()
 
     def get_tor_bootstrap_status(self) -> BootstrapResult:
         response, error = self.send_tor_command("GETINFO status/bootstrap-phase")

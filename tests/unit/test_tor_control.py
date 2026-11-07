@@ -193,16 +193,20 @@ class TestTorControlCommandExecution:
         assert resp is None
         assert "Unknown configuration option" in err
 
-    @patch("torproxy.adapters.tor_control.socket.socket")
-    def test_execute_command_socket_timeout(self, mock_socket_class):
+    @patch("socket.socket")
+    def test_send_tor_command_socket_timeout(self, mock_socket_class, tmp_path):
         mock_sock = MagicMock()
         mock_socket_class.return_value.__enter__.return_value = mock_sock
         mock_sock.connect.side_effect = socket.timeout("timed out")
+        cookie = tmp_path / "cookie"
+        cookie.write_bytes(b"x" * 32)
 
-        resp, err = tor_control.send_command("GETINFO version")
+        resp, err = tor_control.send_command("GETINFO version", cookie_path=str(cookie))
 
         assert resp is None
-        assert "timed out" in err
+        # ISSUE-08: sanitized, leak-free error
+        assert err == "Tor control unavailable"
+        assert "timed out" not in err and "Errno" not in err
 
     @patch("torproxy.adapters.tor_control.socket.socket")
     def test_execute_command_auth_failure(self, mock_socket_class, tmp_path):
