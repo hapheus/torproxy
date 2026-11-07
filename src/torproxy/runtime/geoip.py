@@ -87,6 +87,8 @@ def _write_status(
         if previous_success is None:
             previous_success = previous.get("last_success_at")
     except (OSError, ValueError):
+        # No previous status file (first run) or unreadable/corrupt:
+        # start fresh, keeping only the just-recorded success time.
         pass
     payload = {
         "source": source,
