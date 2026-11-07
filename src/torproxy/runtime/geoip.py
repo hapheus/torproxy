@@ -22,7 +22,6 @@ from torproxy.configuration import Settings
 
 Fetcher = Callable[[str, int], bytes]
 
-_COUNTRY = re.compile(r"[A-Z]{2}\Z")
 _LINE_V4 = re.compile(r"(\d{1,10}),(\d{1,10}),([A-Z]{2})\Z")
 _LINE_V6 = re.compile(r"([0-9A-Fa-f:]+),([0-9A-Fa-f:]+),([A-Z]{2})\Z")
 
@@ -81,7 +80,16 @@ def update_geoip(settings: Settings, fetcher: Fetcher | None = None) -> bool:
         for name, data in (("geoip", v4), ("geoip6", v6)):
             tmp = target_dir / f".{name}.tmp"
             tmp.write_bytes(data)
-            os.chmod(tmp, 0o644)
+            os.chmod(tmp, 0o600)
+            # Tor runs as the unprivileged 'tor' user; when that account
+            # exists (container), hand the file over so Tor can read it.
+            try:
+                import pwd
+
+                tor = pwd.getpwnam("tor")
+                os.chown(tmp, tor.pw_uid, tor.pw_gid)
+            except (KeyError, OSError):
+                pass
             tmp.replace(target_dir / name)
     except OSError as error:
         print(f"[geoip] install failed, keeping previous database: {error}", file=sys.stderr)

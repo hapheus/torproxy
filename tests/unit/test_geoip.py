@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import pytest
 
+import torproxy.runtime.geoip as geoip
 from torproxy.configuration import Settings, render_torrc
+from torproxy.runtime.geoip import has_valid_geoip, update_geoip, validate_geoip_content
 
 GEOIP_V4 = b"# Last updated based on Test\n16777216,16777471,DE\n16777472,16777727,AT\n"
 GEOIP_V6 = b"# Last updated based on Test\n2001:db8::,2001:db8:ffff:ffff:ffff:ffff:ffff:ffff,DE\n"
@@ -52,35 +54,23 @@ class TestGeoipSettings:
 
 class TestGeoipValidation:
     def test_valid_ipv4_content(self):
-        from torproxy.runtime.geoip import validate_geoip_content
-
         assert validate_geoip_content(GEOIP_V4, ipv6=False) is True
 
     def test_valid_ipv6_content(self):
-        from torproxy.runtime.geoip import validate_geoip_content
-
         assert validate_geoip_content(GEOIP_V6, ipv6=True) is True
 
     def test_invalid_country_code_rejected(self):
-        from torproxy.runtime.geoip import validate_geoip_content
-
         assert validate_geoip_content(b"16777216,16777471,DEU\n", ipv6=False) is False
 
     def test_garbage_rejected(self):
-        from torproxy.runtime.geoip import validate_geoip_content
-
         assert validate_geoip_content(b"<html>not found</html>\n", ipv6=False) is False
 
     def test_empty_rejected(self):
-        from torproxy.runtime.geoip import validate_geoip_content
-
         assert validate_geoip_content(b"", ipv6=False) is False
 
 
 class TestGeoipInstallAndFallback:
     def test_successful_install_writes_both_files(self, tmp_path):
-        from torproxy.runtime.geoip import update_geoip
-
         s = Settings.from_mapping(
             {"TORPROXY_GEOIP_AUTO_UPDATE": "1", "TORPROXY_GEOIP_DIR": str(tmp_path)}
         )
@@ -90,8 +80,6 @@ class TestGeoipInstallAndFallback:
         assert (tmp_path / "geoip6").read_bytes() == GEOIP_V6
 
     def test_network_failure_keeps_previous_good_files(self, tmp_path):
-        from torproxy.runtime.geoip import update_geoip
-
         s = Settings.from_mapping(
             {"TORPROXY_GEOIP_AUTO_UPDATE": "1", "TORPROXY_GEOIP_DIR": str(tmp_path)}
         )
@@ -105,8 +93,6 @@ class TestGeoipInstallAndFallback:
         assert (tmp_path / "geoip6").read_bytes() == GEOIP_V6
 
     def test_invalid_payload_keeps_previous_good_files(self, tmp_path):
-        from torproxy.runtime.geoip import update_geoip
-
         s = Settings.from_mapping(
             {"TORPROXY_GEOIP_AUTO_UPDATE": "1", "TORPROXY_GEOIP_DIR": str(tmp_path)}
         )
@@ -119,8 +105,6 @@ class TestGeoipInstallAndFallback:
         assert (tmp_path / "geoip").read_bytes() == GEOIP_V4
 
     def test_has_valid_geoip(self, tmp_path):
-        from torproxy.runtime.geoip import has_valid_geoip, update_geoip
-
         s = Settings.from_mapping(
             {"TORPROXY_GEOIP_AUTO_UPDATE": "1", "TORPROXY_GEOIP_DIR": str(tmp_path)}
         )
@@ -165,8 +149,6 @@ class TestGeoipTorrcRendering:
 
 class TestGeoipLoopAndMain:
     def test_run_loop_updates_and_sighups_once(self, tmp_path, monkeypatch):
-        import torproxy.runtime.geoip as geoip
-
         s = Settings.from_mapping(
             {"TORPROXY_GEOIP_AUTO_UPDATE": "1", "TORPROXY_GEOIP_DIR": str(tmp_path)}
         )
@@ -191,8 +173,6 @@ class TestGeoipLoopAndMain:
         assert (tmp_path / "geoip").read_bytes() == GEOIP_V4
 
     def test_sighup_tor_missing_pidfile_is_noop(self, monkeypatch):
-        import torproxy.runtime.geoip as geoip
-
         killed = []
         monkeypatch.setattr(geoip.os, "kill", lambda pid, sig: killed.append(pid))
         monkeypatch.setattr(geoip.Path, "read_text", lambda self: (_ for _ in ()).throw(OSError()))
@@ -200,8 +180,6 @@ class TestGeoipLoopAndMain:
         assert killed == []
 
     def test_main_disabled_is_noop(self, monkeypatch):
-        import torproxy.runtime.geoip as geoip
-
         monkeypatch.delenv("TORPROXY_GEOIP_AUTO_UPDATE", raising=False)
         monkeypatch.setattr(
             geoip, "update_geoip", lambda s: (_ for _ in ()).throw(AssertionError())
@@ -209,8 +187,6 @@ class TestGeoipLoopAndMain:
         geoip.main()  # default disabled -> no download attempt
 
     def test_main_once_downloads_when_enabled(self, tmp_path, monkeypatch):
-        import torproxy.runtime.geoip as geoip
-
         monkeypatch.setenv("TORPROXY_GEOIP_AUTO_UPDATE", "1")
         monkeypatch.setenv("TORPROXY_GEOIP_DIR", str(tmp_path))
         monkeypatch.setattr(

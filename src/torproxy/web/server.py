@@ -175,7 +175,7 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_response(response.status)
         self.send_header("Content-Type", response.content_type)
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("X-Request-ID", request_id)
+        self.send_header("X-Request-ID", request_id.replace("\r", "").replace("\n", ""))
         # Wildcard CORS only on successful, non-mutating responses (ISSUE-01):
         # never on errors and never on mutations, so foreign origins cannot read
         # or trigger state changes through a browser.
