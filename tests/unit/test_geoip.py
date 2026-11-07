@@ -7,9 +7,15 @@ from __future__ import annotations
 
 import pytest
 
-import torproxy.runtime.geoip as geoip
 from torproxy.configuration import Settings, render_torrc
-from torproxy.runtime.geoip import has_valid_geoip, update_geoip, validate_geoip_content
+from torproxy.runtime.geoip import (
+    _sighup_tor,
+    has_valid_geoip,
+    main,
+    run_loop,
+    update_geoip,
+    validate_geoip_content,
+)
 
 GEOIP_V4 = b"# Last updated based on Test\n16777216,16777471,DE\n16777472,16777727,AT\n"
 GEOIP_V6 = b"# Last updated based on Test\n2001:db8::,2001:db8:ffff:ffff:ffff:ffff:ffff:ffff,DE\n"
@@ -153,12 +159,11 @@ class TestGeoipLoopAndMain:
             {"TORPROXY_GEOIP_AUTO_UPDATE": "1", "TORPROXY_GEOIP_DIR": str(tmp_path)}
         )
         monkeypatch.setattr(
-            geoip,
-            "_https_fetch",
+            "torproxy.runtime.geoip._https_fetch",
             _fetcher({s.geoip_url: GEOIP_V4, s.geoip6_url: GEOIP_V6}),
         )
         sighups = []
-        monkeypatch.setattr(geoip, "_sighup_tor", lambda: sighups.append(True))
+        monkeypatch.setattr("torproxy.runtime.geoip._sighup_tor", lambda: sighups.append(True))
         calls = {"n": 0}
 
         def fake_sleep(_seconds):
@@ -166,34 +171,36 @@ class TestGeoipLoopAndMain:
             if calls["n"] > 1:
                 raise KeyboardInterrupt
 
-        monkeypatch.setattr(geoip.time, "sleep", fake_sleep)
+        monkeypatch.setattr("torproxy.runtime.geoip.time.sleep", fake_sleep)
         with pytest.raises(KeyboardInterrupt):
-            geoip.run_loop(s)
+            run_loop(s)
         assert sighups == [True]
         assert (tmp_path / "geoip").read_bytes() == GEOIP_V4
 
     def test_sighup_tor_missing_pidfile_is_noop(self, monkeypatch):
         killed = []
-        monkeypatch.setattr(geoip.os, "kill", lambda pid, sig: killed.append(pid))
-        monkeypatch.setattr(geoip.Path, "read_text", lambda self: (_ for _ in ()).throw(OSError()))
-        geoip._sighup_tor()  # must not raise
+        monkeypatch.setattr("torproxy.runtime.geoip.os.kill", lambda pid, sig: killed.append(pid))
+        monkeypatch.setattr(
+            "torproxy.runtime.geoip.Path.read_text",
+            lambda self: (_ for _ in ()).throw(OSError()),
+        )
+        _sighup_tor()  # must not raise
         assert killed == []
 
     def test_main_disabled_is_noop(self, monkeypatch):
         monkeypatch.delenv("TORPROXY_GEOIP_AUTO_UPDATE", raising=False)
         monkeypatch.setattr(
-            geoip, "update_geoip", lambda s: (_ for _ in ()).throw(AssertionError())
+            "torproxy.runtime.geoip.update_geoip", lambda s: (_ for _ in ()).throw(AssertionError())
         )
-        geoip.main()  # default disabled -> no download attempt
+        main()  # default disabled -> no download attempt
 
     def test_main_once_downloads_when_enabled(self, tmp_path, monkeypatch):
         monkeypatch.setenv("TORPROXY_GEOIP_AUTO_UPDATE", "1")
         monkeypatch.setenv("TORPROXY_GEOIP_DIR", str(tmp_path))
         monkeypatch.setattr(
-            geoip,
-            "_https_fetch",
+            "torproxy.runtime.geoip._https_fetch",
             lambda url, max_bytes: GEOIP_V4 if url.endswith("/geoip") else GEOIP_V6,
         )
         monkeypatch.setattr("sys.argv", ["geoip", "--once"])
-        geoip.main()
+        main()
         assert (tmp_path / "geoip").exists()

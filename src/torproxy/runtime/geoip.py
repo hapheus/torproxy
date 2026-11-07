@@ -89,6 +89,9 @@ def update_geoip(settings: Settings, fetcher: Fetcher | None = None) -> bool:
                 tor = pwd.getpwnam("tor")
                 os.chown(tmp, tor.pw_uid, tor.pw_gid)
             except (KeyError, OSError):
+                # No 'tor' account (e.g. local dev) or chown not permitted:
+                # keep the 0600 root-owned file; Tor in the container always
+                # has the account, and startup falls back to the bundled DB.
                 pass
             tmp.replace(target_dir / name)
     except OSError as error:
