@@ -299,8 +299,12 @@ runs:
         BOOTSTRAPPED=false
         START=$SECONDS
         while [ $((SECONDS - START)) -lt 180 ]; do
-          STATUS=$(docker exec torproxy-canary-gateway curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/status 2>/dev/null | jq -r '.status // empty' || true)
-          if [ "$STATUS" = "connected" ]; then
+          # Bootstrap progress, not /status "connected": the latter
+          # requires the external check.torproject.org egress probe,
+          # whose intermittent unreachability flaked this step
+          # although Tor itself bootstrapped in seconds (PR #121).
+          PROGRESS=$(docker exec torproxy-canary-gateway curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/health 2>/dev/null | jq -r '.tor.progress // empty' || true)
+          if [ "$PROGRESS" = "100" ]; then
             echo "✅ Gateway Tor successfully connected!"
             BOOTSTRAPPED=true
             break

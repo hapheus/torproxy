@@ -295,8 +295,14 @@ jobs:
           BOOTSTRAPPED=false
           START=$SECONDS
           while [ $((SECONDS - START)) -lt 180 ]; do
-            STATUS=$(docker exec torproxy-gateway-smoke curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/status 2>/dev/null | jq -r '.status // empty' || true)
-            if [ "$STATUS" = "connected" ]; then
+            # Wait for Tor bootstrap progress (100%), not /status
+            # "connected": the latter additionally requires the
+            # external check.torproject.org egress probe, whose
+            # intermittent unreachability from CI runners flaked
+            # this step although Tor itself bootstrapped in seconds
+            # (PR #121). Egress is verified separately below.
+            PROGRESS=$(docker exec torproxy-gateway-smoke curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/health 2>/dev/null | jq -r '.tor.progress // empty' || true)
+            if [ "$PROGRESS" = "100" ]; then
               echo "✅ Gateway container bootstrapped!"
               BOOTSTRAPPED=true
               break
