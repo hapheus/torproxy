@@ -292,3 +292,9 @@ Any request to an unsupported path returns `404 Not Found`.
 - **Cache Eviction:** Automatically invalidated whenever `/connect`, `/disconnect`, or `/reconnect` is executed.
 - **Verification Source:** Evaluated against `https://check.torproject.org/api/ip` through the local Privoxy proxy (`127.0.0.1:8118`).
 - **Egress Guarantee:** Egress verification strictly requires `IsTor: true` from the check service. Responses with `IsTor: false` or missing verification fields are rejected and never cached or reported as connected.
+- **Egress Failure Taxonomy (ISSUE-12, #76):** Transport failures of the probe surface as stable, operator-safe strings in the `error`/`detail` fields of `/ip`, `/health` and `/diagnostics` (the `status` values and JSON shapes are unchanged):
+  - `local HTTP proxy unreachable` — connection refused to the local HTTP proxy on `127.0.0.1:8118` (e.g. Privoxy down; SOCKS5/Tor may still be healthy).
+  - `Tor upstream unavailable via local HTTP proxy (HTTP <code>)` — the local proxy answered with a 5xx (e.g. because no Tor circuit is ready), so Tor/upstream is the problem, not the check service.
+  - `egress check service returned HTTP <code>` — the check service itself answered with a 4xx through a healthy proxy (e.g. 429 rate-limit); this is not a Tor upstream failure. An open circuit breaker keeps the last cause and appends `(circuit breaker open)`.
+  - `egress check service unreachable` — timeout or other transport failure after the local proxy, i.e. the check service itself could not be reached.
+  - `Tor check service reported traffic NOT routed through Tor (IsTor=false)` and the other validation errors (missing `IsTor`, oversized/invalid response) — the check service answered definitively and is not retried.
