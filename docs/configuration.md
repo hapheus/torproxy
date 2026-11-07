@@ -27,6 +27,7 @@ All settings have sensible defaults that allow running `torproxy` with zero conf
 | `TORPROXY_GEOIP_URL` | Tor Project GitLab `geoip` | `https://` URL | Source URL for the IPv4 GeoIP database. |
 | `TORPROXY_GEOIP6_URL` | Tor Project GitLab `geoip6` | `https://` URL | Source URL for the IPv6 GeoIP database. |
 | `TORPROXY_GEOIP_MAX_BYTES` | `10485760` | Positive integer | Maximum accepted size per GeoIP file; larger payloads are rejected. |
+| `TORPROXY_SOCKS_ALLOWED_CIDRS` | *(unset)* | Comma-separated CIDRs | Optional: Restrict which source networks may use the SOCKS port (Tor `SocksPolicy` — accept listed CIDRs plus loopback, reject all else). Default unset = accept all (legacy behavior). Note: Tor's SocksPort is unauthenticated by design; client username/password is only stream isolation, not a credential check. |
 
 ---
 

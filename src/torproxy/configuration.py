@@ -75,6 +75,13 @@ class Settings:
     geoip_url: str = "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip"
     geoip6_url: str = "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6"
     geoip_max_bytes: int = 10 * 1024 * 1024
+    # ISSUE-18c (#108): optional comma-separated CIDRs allowed to
+    # use the SOCKS port (Tor SocksPolicy). Empty = accept all
+    # (legacy behavior). Tor's SocksPort is unauthenticated by
+    # design — username/password from clients is only stream
+    # isolation, never a credential check — so source-IP policy
+    # is the strongest access control Tor itself offers.
+    socks_allowed_cidrs: str = ""
 
     def __post_init__(self) -> None:
         # ISSUE-18b (#107): IPv4 and IPv6 listen addresses are
@@ -128,6 +135,14 @@ class Settings:
         ):
             if not url.startswith("https://"):
                 raise ValueError(f"{name} must be an https:// URL")
+        if self.socks_allowed_cidrs:
+            for cidr in self.socks_allowed_cidrs.split(","):
+                try:
+                    ipaddress.ip_network(cidr.strip(), strict=False)
+                except ValueError:
+                    raise ValueError(
+                        "TORPROXY_SOCKS_ALLOWED_CIDRS must be comma-separated CIDRs"
+                    ) from None
 
     @classmethod
     def from_mapping(cls, env: Mapping[str, str]) -> "Settings":
@@ -210,6 +225,7 @@ class Settings:
                 "https://gitlab.torproject.org/tpo/core/tor/-/raw/main/src/config/geoip6",
             ),
             geoip_max_bytes=_int_setting("TORPROXY_GEOIP_MAX_BYTES", 10 * 1024 * 1024),
+            socks_allowed_cidrs=env.get("TORPROXY_SOCKS_ALLOWED_CIDRS", "").strip(),
         )
 
 
@@ -227,6 +243,13 @@ def render_torrc(settings: Settings, template: str, geoip_active: bool = False) 
             "GeoIPv6File /usr/share/tor/geoip6",
             f"GeoIPv6File {settings.geoip_dir}/geoip6",
         )
+    if settings.socks_allowed_cidrs:
+        # Loopback is always accepted: the internal SOCKS
+        # readiness probe and Privoxy connect from 127.0.0.1.
+        # Tor's SocksPolicy accepts anything not matched, so a
+        # final "reject *" is required to actually restrict.
+        cidrs = ", ".join(c.strip() for c in settings.socks_allowed_cidrs.split(","))
+        result += f"\nSocksPolicy accept 127.0.0.0/8, accept ::1/128, accept {cidrs}, reject *\n"
     if settings.gateway_mode:
         result += f"\nTransPort 127.0.0.1:{settings.trans_port}\n"
         result += f"DNSPort 127.0.0.1:{settings.dns_port}\n"
