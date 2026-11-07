@@ -8,7 +8,7 @@ All settings have sensible defaults that allow running `torproxy` with zero conf
 
 | Variable | Default | Type | Description |
 |---|---|---|---|
-| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | IPv4 address | Address inside the container that Privoxy binds to. Set to `0.0.0.0` to permit container-to-container connections. |
+| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | IP address (IPv4 or IPv6, e.g. `::1`) | Address inside the container that Privoxy binds to. Set to `0.0.0.0` to permit container-to-container connections. |
 | `TORPROXY_LISTEN_PORT` | `8118` | Integer (1–65535) | TCP port inside the container where the Privoxy HTTP proxy listens. |
 | `TORPROXY_API_PORT` | `8080` | Integer (1–65535) | TCP port inside the container where the Python REST API server listens. |
 | `TORPROXY_SOCKS_PORT` | `9050` | Integer (1–65535) | TCP port inside the container where Tor's SOCKS5 proxy listens. |
@@ -17,7 +17,7 @@ All settings have sensible defaults that allow running `torproxy` with zero conf
 | `TORPROXY_STRICT_NODES` | `0` | Boolean (`0`, `1`, `true`, `false`) | When `1`/`true`, strictly reject circuits if no exit relays in selected countries exist. |
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key to secure REST API port `8080`. Recommended for production or shared networks. |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Permits unauthenticated access to `/health` when `TORPROXY_API_TOKEN` is configured. |
-| `TORPROXY_API_LISTEN_ADDRESS` | `0.0.0.0` | IPv4 address | Address inside the container where the REST API server binds. |
+| `TORPROXY_API_LISTEN_ADDRESS` | `0.0.0.0` | IP address (IPv4 or IPv6, e.g. `::1`) | Address inside the container where the REST API server binds. The server binds an `AF_INET6` socket for IPv6 values; keep loopback binding (`::1`) in production unless a reverse proxy / token protects the API. |
 | `TORPROXY_GATEWAY_MODE` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Enables transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
 | `TORPROXY_TRANS_PORT` | `9040` | Integer (1–65535) | TCP port inside the container where Tor's transparent proxy listener (`TransPort`) binds when gateway mode is active. |
 | `TORPROXY_DNS_PORT` | `9053` | Integer (1–65535) | UDP/TCP port inside the container where Tor's internal DNS resolver (`DNSPort`) binds when gateway mode is active. |
@@ -66,7 +66,7 @@ docker run -d --name torproxy --restart unless-stopped \
 
 When the container launches, `/usr/local/bin/start.sh` executes the following sequence:
 
-1. **Validation:** Checks that `TORPROXY_LISTEN_ADDRESS` has 4 valid octets (0–255), all ports are integers (1–65535), no port conflicts exist between Privoxy, API, and SOCKS5, and `TORPROXY_COUNTRY` contains valid 2-letter ISO codes.
+1. **Validation:** Checks that `TORPROXY_LISTEN_ADDRESS` and `TORPROXY_API_LISTEN_ADDRESS` are valid IPv4 or IPv6 addresses, all ports are integers (1–65535), no port conflicts exist between Privoxy, API, and SOCKS5, and `TORPROXY_COUNTRY` contains valid 2-letter ISO codes.
 2. **Template Substitution:**
    - Replaces `__TORPROXY_LISTEN_ADDRESS__`, `__TORPROXY_LISTEN_PORT__`, and `__TORPROXY_SOCKS_PORT__` in `/etc/privoxy/config.template` and writes `/tmp/privoxy.config`.
    - Replaces `__TORPROXY_SOCKS_PORT__` in `/etc/tor/torrc` and appends `ExitNodes` and `StrictNodes` directives if configured, writing `/tmp/torrc`.

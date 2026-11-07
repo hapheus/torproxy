@@ -233,6 +233,11 @@ class ProxyHTTPServer(ThreadingHTTPServer):
         self.router = router
         self.settings = settings
         self.slots = threading.BoundedSemaphore(settings.max_workers)
+        # ISSUE-18b (#107): bind AF_INET6 for IPv6 listen
+        # addresses (::1/::), AF_INET otherwise. Defaults are
+        # IPv4, so existing deployments are unaffected.
+        if ":" in address[0]:
+            self.address_family = socket.AF_INET6
         super().__init__(address, APIHandler)
 
     def process_request(
