@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.0 (Model Context Protocol Registry manifest)
+
+- **Official MCP Registry Manifest (#132):** Added standardized `server.json` manifest conforming to schema `2025-12-11` under namespace `io.github.hapheus/torproxy` for OCI container distribution via `docker.io/hapheus/torproxy:2.7.0`. Validated against `registry.modelcontextprotocol.io`.
+- **Single Source of Truth Enforcement (#132):** Synchronized `server.json` version and image identifier with `pyproject.toml`, `docker/Dockerfile`, and unit contract tests.
+
 ### 2.6.2 (Live verification & test resilience hardening)
 
 - **Live Verification Resilience (#127, #128, PR #129):** Hardened the composite action (`.github/actions/live-verification/action.yml`) against transient Tor network latency, circuit negotiation drops, and upstream probe timeouts. Added 4-attempt retry loops with backoff and fallback IP verification (`api.ipify.org`) for `torproxy_fetch` and transparent gateway egress, while preserving strict fail-closed leak checks (`FETCH_IP == RUNNER_IP`).
@@ -161,5 +166,6 @@ Maintainers must verify the following checklist before publishing any new versio
 - [ ] Static analysis passes (`ruff check .` and `shellcheck`).
 - [ ] Container smoke and multi-port verification succeed (`tests/integration/verify_container.sh`).
 - [ ] Backward compatibility upgrade test succeeds with unchanged Compose configuration.
+- [ ] Single source of truth synchronized (`pyproject.toml`, `src/torproxy/__init__.py`, `docker/Dockerfile`, `server.json`).
 - [ ] Documentation (`README.md`, `DOCKERHUB.md`, `docs/`) updated with the new version and features.
 - [ ] Git tag created matching `vX.Y.Z` and pushed to GitHub.

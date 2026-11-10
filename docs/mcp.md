@@ -176,3 +176,17 @@ When `TORPROXY_API_TOKEN` is configured:
   - `Authorization: Bearer <token>`
   - `X-API-Key: <token>`
   - URL query parameter: `/sse?token=<token>` (useful for browser/EventSource clients where headers cannot be modified).
+
+---
+
+## 6. Official MCP Registry Manifest
+
+`torproxy` includes a standardized [`server.json`](../server.json) manifest conforming to the Model Context Protocol Registry specification (`registry.modelcontextprotocol.io`):
+
+- **Namespace:** `io.github.hapheus/torproxy`
+- **Distribution:** OCI container image (`docker.io/hapheus/torproxy:<version>`)
+- **Transport:** `stdio` via `torproxy mcp`
+- **Validation:** Can be validated locally using the official publisher tool:
+  ```bash
+  mcp-publisher validate server.json
+  ```
