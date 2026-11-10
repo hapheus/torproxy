@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.2] — 2026-11-10
+
+### Fixed
+- **ci**: Harden live image verification composite action with retry loops, backoff, and fallback IP verification for MCP (`torproxy_fetch`) and transparent gateway egress (#127, #128, #129)
+- **ci**: Accept Tor bootstrap completion via `/health` (`progress == 100`) during GeoIP test container validation and dump container logs on failure (#128, #129)
+- **gateway**: Support fallback IP reflection check with host IP leak detection in `verify_gateway.sh` (#127, #129)
+
 ## [2.6.1] — 2026-11-10
 
 ### Fixed
@@ -199,7 +206,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.6.1...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.6.2...HEAD
+[2.6.2]: https://github.com/hapheus/torproxy/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/hapheus/torproxy/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/hapheus/torproxy/compare/v2.5.0...v2.6.0
 [2.1.1]: https://github.com/hapheus/torproxy/compare/v2.1.0...v2.1.1

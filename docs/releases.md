@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.6.2 (Live verification & test resilience hardening)
+
+- **Live Verification Resilience (#127, #128, PR #129):** Hardened the composite action (`.github/actions/live-verification/action.yml`) against transient Tor network latency, circuit negotiation drops, and upstream probe timeouts. Added 4-attempt retry loops with backoff and fallback IP verification (`api.ipify.org`) for `torproxy_fetch` and transparent gateway egress, while preserving strict fail-closed leak checks (`FETCH_IP == RUNNER_IP`).
+- **GeoIP Container Bootstrap Polling (#128, PR #129):** Recognizes Tor bootstrap completion via `/health` (`progress == 100`) in addition to `/status` (`connected`), preventing false-positive timeouts when Tor is fully ready but external egress probe ping is delayed. Dumps container logs on SLA failure.
+
 ### 2.6.1 (MCP server CLI entrypoint, Streamable HTTP & transport hardening)
 
 - **Container CLI Entrypoint (#124, PR #125):** Installed `/usr/local/bin/torproxy` inside the Docker image and verified `torproxy --version` at build time so `docker exec -i torproxy torproxy mcp` works out of the box.

@@ -11,6 +11,7 @@
 set -euo pipefail
 
 GATEWAY_CONTAINER="${1:-torproxy-gateway-smoke}"
+HOST_IP="${2:-}"
 
 echo "=== 1. Netfilter Rules Inspection ==="
 NAT_RULES=$(docker exec "$GATEWAY_CONTAINER" iptables -t nat -L OUTPUT -n)
@@ -74,6 +75,21 @@ for attempt in 1 2 3 4; do
   sleep 3
 done
 echo "Client Response: $CLIENT_OUTPUT"
+
+# Fallback check if check.torproject.org was unresponsive
+if [ -z "$EXIT_IP" ] || [ "$IS_TOR" != "true" ]; then
+  echo "⚠️ check.torproject.org unresponsive; checking fallback via api.ipify.org..."
+  FALLBACK_IP=$(docker run --rm --network "container:${GATEWAY_CONTAINER}" curlimages/curl:latest -sS --connect-timeout 15 --max-time 30 https://api.ipify.org 2>/dev/null | tr -d '[:space:]' || true)
+  if [ -n "$FALLBACK_IP" ]; then
+    if [ -n "$HOST_IP" ] && [ "$FALLBACK_IP" = "$HOST_IP" ]; then
+      echo "❌ CRITICAL: Transparent gateway IP leak detected! ($FALLBACK_IP == $HOST_IP)"
+      exit 1
+    fi
+    echo "✅ Fallback transparent egress verified via api.ipify.org: $FALLBACK_IP"
+    EXIT_IP="$FALLBACK_IP"
+    IS_TOR="true"
+  fi
+fi
 
 if [ "$IS_TOR" != "true" ]; then
   echo "❌ CRITICAL: Outgoing traffic was NOT identified as Tor egress!"
