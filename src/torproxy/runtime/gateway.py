@@ -11,7 +11,7 @@ def generate_iptables_rules(
     trans_port: int = 9040,
     dns_port: int = 9053,
     tor_user: str = "tor",
-    exempt_ports: tuple[int, ...] = (8118, 8080, 9050, 9051),
+    exempt_ports: tuple[int, ...] = (8118, 8080, 9050, 9051, 2501),
 ) -> list[list[str]]:
     """Generate iptables and ip6tables commands for transparent Tor routing and kill switch.
 
@@ -297,7 +297,13 @@ def setup_gateway(settings: Settings) -> None:
             "Please add 'cap_add: [NET_ADMIN]' to your Docker compose configuration."
         )
 
-    exempt = (settings.proxy_port, settings.api_port, settings.socks_port, settings.control_port)
+    exempt: tuple[int, ...] = (
+        settings.proxy_port,
+        settings.api_port,
+        settings.socks_port,
+        settings.control_port,
+        *((settings.mcp_port,) if settings.mcp_enabled else ()),
+    )
     rules = generate_iptables_rules(
         trans_port=settings.trans_port,
         dns_port=settings.dns_port,

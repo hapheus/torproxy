@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] — 2026-11-10
+
+### Fixed
+- **docker**: Install `/usr/local/bin/torproxy` CLI entrypoint in container image so `docker exec -i torproxy torproxy mcp` works as documented (#124, #125)
+- **mcp**: Support MCP Streamable HTTP (`POST /mcp`, `POST /sse`, `POST /`), preserve query-token SSE session authentication, use `hmac.compare_digest`, and bind `AF_INET6` for IPv6 addresses (#124, #125)
+- **gateway**: Exempt MCP port `2501` in transparent gateway netfilter rules (#124, #125)
+- **mcp**: Negotiate `protocolVersion`, support `prompts/list` and `resources/templates/list`, accept `strict_nodes` alias, and block non-HTTP(S) redirects in `torproxy_fetch` (#124, #125)
+
 ## [2.6.0] — 2026-11-10
 
 ### Added
@@ -191,7 +199,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/hapheus/torproxy/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/hapheus/torproxy/compare/v2.5.0...v2.6.0
 [2.1.1]: https://github.com/hapheus/torproxy/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/hapheus/torproxy/compare/v2.0.2...v2.1.0

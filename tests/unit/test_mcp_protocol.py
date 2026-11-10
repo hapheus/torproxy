@@ -393,3 +393,56 @@ def test_mcp_tools_call_fetch_http_error(mcp_setup, monkeypatch):
     content = json.loads(resp["result"]["content"][0]["text"])
     assert content["status"] == 404
     assert content["body"] == "Not Found"
+
+
+@pytest.mark.unit
+def test_mcp_initialize_version_negotiation_and_optional_lists(mcp_setup):
+    handler, _, _ = mcp_setup
+    req = {
+        "jsonrpc": "2.0",
+        "id": 30,
+        "method": "initialize",
+        "params": {"protocolVersion": "2025-03-26"},
+    }
+    resp = handler.handle_jsonrpc(req)
+    assert resp["result"]["protocolVersion"] == "2025-03-26"
+
+    prompts_resp = handler.handle_jsonrpc({"jsonrpc": "2.0", "id": 31, "method": "prompts/list"})
+    assert prompts_resp["result"] == {"prompts": []}
+
+    templates_resp = handler.handle_jsonrpc(
+        {"jsonrpc": "2.0", "id": 32, "method": "resources/templates/list"}
+    )
+    assert templates_resp["result"] == {"resourceTemplates": []}
+
+
+@pytest.mark.unit
+def test_mcp_reconnect_accepts_strict_nodes_alias(mcp_setup):
+    handler, _, _ = mcp_setup
+    req = {
+        "jsonrpc": "2.0",
+        "id": 33,
+        "method": "tools/call",
+        "params": {
+            "name": "torproxy_reconnect",
+            "arguments": {"country": "at", "strict_nodes": True},
+        },
+    }
+    resp = handler.handle_jsonrpc(req)
+    assert resp["result"]["isError"] is False
+    content = json.loads(resp["result"]["content"][0]["text"])
+    assert content["exit_country"] == "AT"
+    assert content["strict_nodes"] is True
+
+
+@pytest.mark.unit
+def test_mcp_fetch_rejects_redirect_to_disallowed_scheme(mcp_setup):
+    import urllib.request
+    from email.message import Message
+
+    from torproxy.mcp.protocol import _SafeRedirectHandler
+
+    redirect_handler = _SafeRedirectHandler()
+    req = urllib.request.Request("https://example.com/start")
+    with pytest.raises(urllib.error.URLError, match="Unsupported redirect URL scheme"):
+        redirect_handler.redirect_request(req, None, 302, "Found", Message(), "file:///etc/passwd")
