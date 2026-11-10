@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.3 (DockerHub SemVer tagging and MCP Registry publish coordination)
+
+- **DockerHub Tagging & MCP Publish Coordination (#138):** Added `type=semver,pattern={{version}}` to `publish-dockerhub.yml` so Docker Hub receives both `X.Y.Z` and `vX.Y.Z` tags. Added synchronization in `publish-mcp.yml` to wait for the target OCI container image to be verified on Docker Hub before publishing `server.json` to `registry.modelcontextprotocol.io`.
+
 ### 2.7.2 (MCP Registry automated publishing workflow)
 
 - **Automated MCP Registry Publish (#134, #135):** Added `.github/workflows/publish-mcp.yml` using GitHub Actions OIDC (`id-token: write`) to automatically publish the verified `server.json` to `registry.modelcontextprotocol.io` upon pushing release tags (`v*`).

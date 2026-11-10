@@ -55,6 +55,25 @@ jobs:
       - name: Validate server.json
         run: ./mcp-publisher validate server.json
 
+      - name: Wait for OCI image to become available in registry
+        run: |
+          IMAGE=$(jq -r '.packages[0].identifier' server.json)
+          echo "Checking registry for OCI image $IMAGE..."
+          FOUND=false
+          for i in {1..30}; do
+            if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+              echo "✅ $IMAGE is available in the container registry."
+              FOUND=true
+              break
+            fi
+            echo "Attempt $i/30: $IMAGE not yet found in registry, waiting 15s..."
+            sleep 15
+          done
+          if [ "$FOUND" != "true" ]; then
+            echo "❌ Timed out waiting for $IMAGE in registry."
+            exit 1
+          fi
+
       - name: Authenticate with MCP Registry via GitHub OIDC
         run: ./mcp-publisher login github-oidc
 
