@@ -19,6 +19,7 @@ This document defines the strict, non-negotiable backward compatibility contract
 | **HTTP Proxy** | `8118` | `8118` (`127.0.0.1`) | HTTP (Privoxy) | Unauthenticated | Standard HTTP/HTTPS forward proxy routed via Tor SOCKS5. |
 | **SOCKS5 Proxy** | `9050` | `9050` (`127.0.0.1`) | SOCKS5 (Tor) | Unauthenticated | Tor SOCKS5 proxy with remote DNS resolution (`socks5h`). |
 | **Control REST API** | `8080` | `8080` (`127.0.0.1`) | HTTP/REST | Unauthenticated | JSON management and monitoring interface. |
+| **MCP Server (SSE)** | `2501` | `2501` (`127.0.0.1`) | HTTP/SSE (JSON-RPC) | Inherits API Token | Built-in Model Context Protocol server for AI agents. |
 | **Tor ControlPort** | `9051` | Not Published | Tor Control | Cookie Auth | Internal loopback only (`127.0.0.1:9051`), never published to host. |
 
 ### Network Guarantees vs. Implementation Details
@@ -49,6 +50,9 @@ This document defines the strict, non-negotiable backward compatibility contract
 | `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API (8080). Default: unset (unauthenticated). |
 | `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | Boolean (`0`, `1`, `true`, `false`) | Optional: Permits unauthenticated `/health` probe access when token auth is enabled. |
 | `TORPROXY_SOCKS_ALLOWED_CIDRS` | *(unset)* | Comma-separated CIDRs | Optional: Restricts SOCKS port access by source CIDR (Tor `SocksPolicy`). Default unset = accept all (legacy behavior). |
+| `TORPROXY_MCP_ENABLED` | `1` | Boolean (`0`, `1`, `true`, `false`) | Optional additive: Enables built-in MCP server. Default `1` (enabled). |
+| `TORPROXY_MCP_PORT` | `2501` | Integer `1`–`65535` | Listening port for the MCP HTTP/SSE server. |
+| `TORPROXY_MCP_LISTEN_ADDRESS` | `0.0.0.0` | Valid IP address (IPv4 or IPv6) | Bind address for the MCP server inside the container. |
 
 ---
 

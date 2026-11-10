@@ -15,7 +15,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hapheus/torproxy/badge)](https://scorecard.dev/viewer/?uri=github.com/hapheus/torproxy)
 [![OpenSSF Best Practices](https://img.shields.io/cii/percentage/15828?style=flat-square&logo=linuxfoundation&label=OpenSSF%20Best%20Practices)](https://www.bestpractices.dev/projects/15828)
 
-[Quick Start](#quick-start) · [Transparent Gateway](#transparent-tor-gateway) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
+[Quick Start](#quick-start) · [Model Context Protocol (MCP)](#-model-context-protocol-mcp) · [Transparent Gateway](#transparent-tor-gateway) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -113,6 +113,46 @@ services:
 
 ---
 
+## 🤖 Model Context Protocol (MCP)
+
+`torproxy` includes a built-in, zero-dependency **Model Context Protocol (MCP)** server on port `2501` (SSE) and via Stdio (`torproxy mcp`), allowing AI agents (Claude Desktop, Cursor, Antigravity) to manage Tor circuits and execute anonymized web requests directly.
+
+### Claude Desktop Integration (`claude_desktop_config.json`)
+Connect Claude Desktop to your running `torproxy` container via Stdio without exposing host ports:
+```json
+{
+  "mcpServers": {
+    "torproxy": {
+      "command": "docker",
+      "args": ["exec", "-i", "torproxy", "torproxy", "mcp"]
+    }
+  }
+}
+```
+
+### Cursor & Antigravity Integration (`.cursor/mcp.json`)
+Connect via HTTP/SSE:
+```json
+{
+  "mcpServers": {
+    "torproxy": {
+      "url": "http://127.0.0.1:2501/sse"
+    }
+  }
+}
+```
+
+### Key Tools Available to Agents
+- `torproxy_fetch`: **Zero-config fetch** — execute HTTP/HTTPS or `.onion` requests strictly routed through Tor (no local curl or host proxy setup needed).
+- `torproxy_status`: Retrieve live bootstrap progress, egress IP, and GeoIP metadata.
+- `torproxy_get_ip`: Query the current verified Tor exit IP.
+- `torproxy_reconnect`: Request a new Tor identity (`SIGNAL NEWNYM`), optionally changing exit country (`country="DE"`).
+- `torproxy_health` & `torproxy_diagnostics`: Automated operational health and circuit diagnostics.
+
+See [docs/mcp.md](docs/mcp.md) for full configuration details, authentication options, and tool schemas.
+
+---
+
 ## Available Interfaces and Ports
 
 | Interface | Default Port | Internal Service | Description |
@@ -120,6 +160,7 @@ services:
 | **HTTP Proxy** | `8118` | Privoxy | HTTP/HTTPS forward proxy routing traffic to Tor. Fails closed (500/503) if Tor is disconnected. |
 | **SOCKS5 Proxy** | `9050` | Tor | Direct Tor SOCKS5 listener. Supports remote DNS resolution via `socks5h://`. |
 | **REST API** | `8080` | Python REST API | JSON management and health endpoint. Circuit rotation and connection management. |
+| **MCP Server (SSE)** | `2501` | Python MCP Server | Model Context Protocol server (SSE) for AI agents (Cursor, Antigravity). |
 | **TransPort** *(Gateway Mode)* | `9040` | Tor | Transparent TCP proxy redirect listener when `TORPROXY_GATEWAY_MODE=true`. |
 | **DNSPort** *(Gateway Mode)* | `9053` | Tor | Transparent DNS resolver listener when `TORPROXY_GATEWAY_MODE=true`. |
 

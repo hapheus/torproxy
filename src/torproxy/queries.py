@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
+from torproxy.metrics import render_metrics
 from torproxy.models import Response
 from torproxy.service import ProxyService
 
@@ -184,3 +185,23 @@ class ProxyQueries:
                 "egress": {"verified": bool(ip), "ip": ip, "error": ip_error if not ip else None},
             },
         )
+
+    def metrics(self) -> Response:
+        bootstrap, _ = self.service.get_tor_bootstrap_status()
+        s = self.service.state
+        with s.lock:
+            return Response(
+                200,
+                render_metrics(
+                    self.service.state.snapshot(),
+                    bootstrap,
+                    self.service.check_socks5_ready(),
+                    self.service.settings.gateway_mode,
+                    requests_total=s.requests_total,
+                    requests_rejected_total=s.requests_rejected_total,
+                    http_4xx_total=s.http_4xx_total,
+                    http_5xx_total=s.http_5xx_total,
+                    latency_total_seconds=s.request_latency_seconds_total,
+                ),
+                "text/plain; version=0.0.4; charset=utf-8",
+            )

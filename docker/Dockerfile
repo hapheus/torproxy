@@ -36,7 +36,9 @@ ENV PYTHON_VERSION=${PYTHON_VERSION} \
     TORPROXY_LISTEN_ADDRESS=0.0.0.0 \
     TORPROXY_LISTEN_PORT=8118 \
     TORPROXY_API_PORT=8080 \
-    TORPROXY_SOCKS_PORT=9050
+    TORPROXY_SOCKS_PORT=9050 \
+    TORPROXY_MCP_PORT=2501 \
+    TORPROXY_MCP_ENABLED=true
 
 # Stage sources, then install into the sysconfig-derived site-packages so the
 # layout follows the interpreter actually present in the image (ISSUE-15).
@@ -61,7 +63,7 @@ COPY --chmod=644 docker/torrc /etc/tor/torrc
 # torproxy) so the gateway netfilter rules can scope the WAN bypass to
 # the dedicated tor UID. No daemon ever runs as root.
 
-EXPOSE 8118 8080 9050
+EXPOSE 8118 8080 9050 2501
 
 HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=3 \
   CMD ["/usr/local/bin/healthcheck.sh"]
