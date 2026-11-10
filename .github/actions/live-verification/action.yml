@@ -92,6 +92,10 @@ runs:
             BOOTSTRAPPED=true
             break
           fi
+          if [ "$i" -eq 12 ] || [ "$i" -eq 24 ]; then
+            echo "⚠️ Tor still at ${PROGRESS:-0}% after $((i * 5))s; restarting container to select a fresh directory mirror..."
+            docker restart torproxy-canary || true
+          fi
           sleep 5
         done
 
@@ -376,7 +380,9 @@ runs:
         # capped at 180s with bounded polls, like the PR gate.
         BOOTSTRAPPED=false
         START=$SECONDS
+        ATTEMPT=0
         while [ $((SECONDS - START)) -lt 180 ]; do
+          ATTEMPT=$((ATTEMPT + 1))
           # Bootstrap progress, not /status "connected": the latter
           # requires the external check.torproject.org egress probe,
           # whose intermittent unreachability flaked this step
@@ -386,6 +392,10 @@ runs:
             echo "✅ Gateway Tor successfully connected!"
             BOOTSTRAPPED=true
             break
+          fi
+          if [ "$ATTEMPT" -eq 12 ] || [ "$ATTEMPT" -eq 24 ]; then
+            echo "⚠️ Gateway Tor still at ${PROGRESS:-0}% after $((SECONDS - START))s; restarting container to select a fresh directory mirror..."
+            docker restart torproxy-canary-gateway || true
           fi
           sleep 5
         done
@@ -478,6 +488,10 @@ runs:
               exit 1
             fi
             break
+          fi
+          if [ "$i" -eq 12 ] || [ "$i" -eq 24 ]; then
+            echo "⚠️ GeoIP Tor still at ${PROGRESS:-0}% after $((i * 5))s; restarting container to select a fresh directory mirror..."
+            docker restart torproxy-canary-geoip || true
           fi
           sleep 5
         done

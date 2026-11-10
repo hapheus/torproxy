@@ -322,6 +322,8 @@ class TestEnvironmentAndDefaultsContract:
             with open(server_json_path, "r", encoding="utf-8") as f:
                 server_data = json.load(f)
             assert server_data["version"] == project_version
+            server_name = server_data["name"]
+            assert f'io.modelcontextprotocol.server.name="{server_name}"' in dockerfile
             for pkg in server_data.get("packages", []):
                 if pkg.get("registryType") == "oci":
                     assert pkg["identifier"].endswith(f":{project_version}")
