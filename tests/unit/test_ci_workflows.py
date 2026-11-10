@@ -119,6 +119,9 @@ def test_publish_mcp_waits_for_live_verification() -> None:
     assert "needs: verify-live" in publish_mcp or "needs: [verify-live]" in publish_mcp
     assert "id-token: write" in publish_mcp
     assert "mcp-publisher login github-oidc" in publish_mcp
+    assert "docker manifest inspect" in publish_mcp
+    publish_dockerhub = _read("publish-dockerhub.yml")
+    assert "io.modelcontextprotocol.server.name=io.github.hapheus/torproxy" in publish_dockerhub
 
 
 def test_daily_canary_reuses_the_shared_action() -> None:

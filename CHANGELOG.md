@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.4] — 2026-11-10
+
+### Fixed
+- **mcp**: Add required `io.modelcontextprotocol.server.name="io.github.hapheus/torproxy"` OCI label and annotations to Dockerfile and Docker Hub workflow (#141)
+- **ci**: Add mid-window container restart fallback in live verification when Tor bootstrap stalls on a slow directory mirror (#141)
+
 ## [2.7.3] — 2026-11-10
 
 ### Fixed
@@ -229,7 +235,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.3...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.4...HEAD
+[2.7.4]: https://github.com/hapheus/torproxy/compare/v2.7.3...v2.7.4
 [2.7.3]: https://github.com/hapheus/torproxy/compare/v2.7.2...v2.7.3
 [2.7.2]: https://github.com/hapheus/torproxy/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/hapheus/torproxy/compare/v2.7.0...v2.7.1

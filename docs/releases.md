@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.4 (MCP Registry OCI label requirement and live bootstrap resilience)
+
+- **MCP Registry OCI Label & Annotations (#141):** Added `LABEL io.modelcontextprotocol.server.name="io.github.hapheus/torproxy"` to `docker/Dockerfile` and OCI index/manifest annotations in `publish-dockerhub.yml`, satisfying the official MCP Registry verification requirement for OCI container packages.
+- **Bootstrap Mirror Failover (#141):** Added mid-window container restart fallback in `live-verification/action.yml` when cold-start Tor consensus download stalls on an unresponsive directory mirror.
+
 ### 2.7.3 (DockerHub SemVer tagging and MCP Registry publish coordination)
 
 - **DockerHub Tagging & MCP Publish Coordination (#138):** Added `type=semver,pattern={{version}}` to `publish-dockerhub.yml` so Docker Hub receives both `X.Y.Z` and `vX.Y.Z` tags. Added synchronization in `publish-mcp.yml` to wait for the target OCI container image to be verified on Docker Hub before publishing `server.json` to `registry.modelcontextprotocol.io`.
