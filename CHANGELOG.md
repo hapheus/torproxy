@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.3] — 2026-11-10
+
+### Fixed
+- **ci**: Add SemVer `type=semver,pattern={{version}}` tagging to Docker Hub publishing workflow (#138)
+- **ci**: Coordinate MCP Registry publish workflow to wait for OCI container image availability on Docker Hub (#138)
+
 ## [2.7.2] — 2026-11-10
 
 ### Added
