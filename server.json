@@ -1,0 +1,39 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.hapheus/torproxy",
+  "title": "torproxy",
+  "description": "Tor HTTP and SOCKS5 proxy with REST API and built-in MCP server.",
+  "version": "2.7.0",
+  "repository": {
+    "url": "https://github.com/hapheus/torproxy",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "docker.io/hapheus/torproxy:2.7.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "torproxy"
+        },
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TORPROXY_API_TOKEN",
+          "description": "Optional secret token for authenticating REST and MCP requests.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

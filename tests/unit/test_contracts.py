@@ -317,6 +317,15 @@ class TestEnvironmentAndDefaultsContract:
 
         assert torproxy.__version__ == project_version
 
+        server_json_path = os.path.join(REPO_ROOT, "server.json")
+        if os.path.exists(server_json_path):
+            with open(server_json_path, "r", encoding="utf-8") as f:
+                server_data = json.load(f)
+            assert server_data["version"] == project_version
+            for pkg in server_data.get("packages", []):
+                if pkg.get("registryType") == "oci":
+                    assert pkg["identifier"].endswith(f":{project_version}")
+
     def test_compiled_artifacts_ignored_everywhere(self):
         # ISSUE-16: no .pyc/__pycache__ may leak into the repo or the image.
         gitignore_path = os.path.join(REPO_ROOT, ".gitignore")
