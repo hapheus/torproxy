@@ -91,6 +91,12 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.6.1 (MCP server CLI entrypoint, Streamable HTTP & transport hardening)
+
+- **Container CLI Entrypoint (#124, PR #125):** Installed `/usr/local/bin/torproxy` inside the Docker image and verified `torproxy --version` at build time so `docker exec -i torproxy torproxy mcp` works out of the box.
+- **Streamable HTTP & SSE Hardening (#124, PR #125):** Added MCP `2025-03-26+` Streamable HTTP support (`POST /mcp`, `POST /sse`, `POST /`), authenticated SSE session continuity for `?token=...` clients, constant-time `hmac.compare_digest` token verification, IPv6 listener support (`AF_INET6`), and non-blocking session shutdown.
+- **Gateway Mode & Protocol Hardening (#124, PR #125):** Exempted MCP port `2501` in transparent gateway netfilter rules (`TORPROXY_GATEWAY_MODE=true`), added `protocolVersion` negotiation and `_SafeRedirectHandler` redirect scheme validation in `torproxy_fetch`.
+
 ### 2.6.0 (Model Context Protocol server & torproxy_fetch)
 
 - **Integrated MCP Server (ISSUE-122, PR #123):** Built-in zero-dependency Model Context Protocol (MCP) server running on port `2501` (HTTP/SSE) and via Stdio (`torproxy mcp`), enabling autonomous AI agents (Claude Desktop, Cursor, Antigravity) to orchestrate Tor circuits and inspect status.
