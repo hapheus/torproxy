@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.1 (Dependency and GitHub Actions updates)
+
+- **Dependency Updates (#130, #131):** Bumped `ruff` to 0.17.4 and updated GitHub Actions pin digests (CodeQL 4.39.3, docker/login-action 4.8.0, git-cliff-action 4.9.1, action-gh-release 3.0.4).
+
 ### 2.7.0 (Model Context Protocol Registry manifest)
 
 - **Official MCP Registry Manifest (#132):** Added standardized `server.json` manifest conforming to schema `2025-12-11` under namespace `io.github.hapheus/torproxy` for OCI container distribution via `docker.io/hapheus/torproxy:2.7.0`. Validated against `registry.modelcontextprotocol.io`.
