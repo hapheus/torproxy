@@ -65,6 +65,7 @@ runs:
           -p 8118:8118 \
           -p 9050:9050 \
           -p 8080:8080 \
+          -p 2501:2501 \
           "${{ inputs.image_ref }}")
         echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"
 
@@ -212,6 +213,52 @@ runs:
         else
           echo "✅ SOCKS5 Proxy OK: Exit-IP is $EXIT_IP (IsTor=true)"
         fi
+
+    # -------------------------------------------------------------
+    # 5b. MCP Server & torproxy_fetch live verification
+    # -------------------------------------------------------------
+    - name: Verify MCP Server & torproxy_fetch Live Canary
+      shell: bash
+      run: |
+        echo "Testing MCP Server tools and live fetch over Tor..."
+        RUNNER_IP="${{ steps.host-info.outputs.runner_ip }}"
+
+        # 1. MCP Stdio test: ping and tool listing
+        PING_RESP=$(echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | docker exec -i torproxy-canary python3 -m torproxy mcp 2>/dev/null)
+        echo "MCP Ping: $PING_RESP"
+        echo "$PING_RESP" | jq -e '.result == {}' >/dev/null
+
+        # 2. Live fetch test via torproxy_fetch tool over Tor
+        FETCH_REQ='{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"torproxy_fetch","arguments":{"url":"https://check.torproject.org/api/ip"}}}'
+        FETCH_RESP=$(echo "$FETCH_REQ" | docker exec -i torproxy-canary python3 -m torproxy mcp 2>/dev/null)
+        echo "MCP Fetch Response: $FETCH_RESP"
+        echo "$FETCH_RESP" | jq -e '.result.isError == false' >/dev/null
+
+        PAYLOAD=$(echo "$FETCH_RESP" | jq -r '.result.content[0].text')
+        STATUS_CODE=$(echo "$PAYLOAD" | jq -r '.status')
+        BODY=$(echo "$PAYLOAD" | jq -r '.body')
+
+        if [ "$STATUS_CODE" != "200" ]; then
+          echo "❌ MCP torproxy_fetch returned status $STATUS_CODE (expected 200)"
+          exit 1
+        fi
+
+        FETCH_IP=$(echo "$BODY" | jq -r '.IP // empty')
+        IS_TOR=$(echo "$BODY" | jq -r '.IsTor // empty')
+
+        echo "MCP fetched exit IP: $FETCH_IP (IsTor: $IS_TOR)"
+
+        if [ "$FETCH_IP" = "$RUNNER_IP" ]; then
+          echo "❌ CRITICAL: MCP torproxy_fetch leaked host IP ($FETCH_IP == $RUNNER_IP)!"
+          exit 1
+        fi
+
+        if [ "$IS_TOR" = "false" ]; then
+          echo "❌ CRITICAL: check.torproject.org reported MCP fetch was NOT through Tor!"
+          exit 1
+        fi
+
+        echo "✅ MCP Server live verification passed: fetched through Tor, leak-free."
 
     # -------------------------------------------------------------
     # 6. Circuit rotation (/reconnect -> SIGNAL NEWNYM)
