@@ -1,0 +1,62 @@
+name: Publish to MCP Registry
+
+# Triggers when a new version tag (e.g., v2.7.1) is pushed.
+#
+# Note on publishing architecture:
+# - Gated strictly behind `verify-live` to prevent publishing untested configurations.
+# - Uses GitHub Actions OIDC (`id-token: write`) to securely authenticate
+#   under the repository namespace `io.github.hapheus/*` without static tokens.
+# - Validates `server.json` before publishing.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    name: "Live Image Verification (Pre-Publish Gate)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run Live Image Verification
+        uses: ./.github/actions/live-verification
+        with:
+          image_ref: "torproxy:smoke-test"
+          build_local: "true"
+          run_alerts: "false"
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  publish-mcp:
+    name: "Publish to MCP Registry"
+    needs: verify-live
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install mcp-publisher
+        run: |
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Validate server.json
+        run: ./mcp-publisher validate server.json
+
+      - name: Authenticate with MCP Registry via GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json to MCP Registry
+        run: ./mcp-publisher publish server.json

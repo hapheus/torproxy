@@ -113,6 +113,14 @@ def test_release_waits_for_live_verification() -> None:
     assert "verify-live" in release
 
 
+def test_publish_mcp_waits_for_live_verification() -> None:
+    publish_mcp = _read("publish-mcp.yml")
+    assert "uses: ./.github/actions/live-verification" in publish_mcp
+    assert "needs: verify-live" in publish_mcp or "needs: [verify-live]" in publish_mcp
+    assert "id-token: write" in publish_mcp
+    assert "mcp-publisher login github-oidc" in publish_mcp
+
+
 def test_daily_canary_reuses_the_shared_action() -> None:
     daily = _read("daily-image-verification.yml")
     assert "schedule:" in daily

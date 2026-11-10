@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.1 (MCP Registry automated publishing workflow)
+
+- **Automated MCP Registry Publish (#134):** Added `.github/workflows/publish-mcp.yml` using GitHub Actions OIDC (`id-token: write`) to automatically publish the verified `server.json` to `registry.modelcontextprotocol.io` upon pushing release tags (`v*`).
+- **Dependencies (#130):** Bumped ruff to 0.17.4.
+
 ### 2.7.0 (Model Context Protocol Registry manifest)
 
 - **Official MCP Registry Manifest (#132):** Added standardized `server.json` manifest conforming to schema `2025-12-11` under namespace `io.github.hapheus/torproxy` for OCI container distribution via `docker.io/hapheus/torproxy:2.7.0`. Validated against `registry.modelcontextprotocol.io`.
