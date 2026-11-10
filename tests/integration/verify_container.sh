@@ -71,6 +71,21 @@ echo "legacy GET /reconnect response: $LEGACY_RESP"
 echo "$LEGACY_RESP" | jq -e '.action == "reconnect" and .status == "success"' >/dev/null
 echo "✅ REST API contracts verified."
 
+echo "=== 3b. MCP Server Verification ==="
+# Test MCP Stdio ping & tools/list
+MCP_STDIO_RESP=$(echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | docker exec -i "$CONTAINER_NAME" python3 -m torproxy mcp 2>/dev/null)
+echo "MCP stdio ping response: $MCP_STDIO_RESP"
+echo "$MCP_STDIO_RESP" | jq -e '.result == {}' >/dev/null
+
+MCP_TOOLS_RESP=$(echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | docker exec -i "$CONTAINER_NAME" python3 -m torproxy mcp 2>/dev/null)
+echo "$MCP_TOOLS_RESP" | jq -e '.result.tools | map(.name) | contains(["torproxy_fetch", "torproxy_status", "torproxy_reconnect"])' >/dev/null
+
+# Test MCP SSE endpoint on internal port 2501
+SSE_ENDPOINT_RESP=$(docker exec "$CONTAINER_NAME" curl -fsS --max-time 3 http://127.0.0.1:2501/sse 2>/dev/null | head -n 2 || true)
+echo "MCP SSE endpoint response: $SSE_ENDPOINT_RESP"
+echo "$SSE_ENDPOINT_RESP" | grep -q "event: endpoint"
+echo "✅ MCP Server (stdio & SSE port 2501) verified."
+
 echo "=== 4. SOCKS5 Handshake Verification ==="
 # Send RFC1928 greeting: \x05\x01\x00 (Version 5, 1 auth method, NO AUTH)
 # Response must be \x05\x00

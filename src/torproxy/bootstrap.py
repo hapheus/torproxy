@@ -5,7 +5,10 @@ from torproxy.adapters.geoip_status import FileGeoIpStatus
 from torproxy.adapters.probes import SocksReadinessProbe, TorEgressProbe
 from torproxy.adapters.tor_control import TorControlClient
 from torproxy.configuration import Settings
+from torproxy.mcp.protocol import McpHandler
+from torproxy.mcp.sse import McpSseServer
 from torproxy.ports import Clock, ControlPort, EgressProbe, GeoIpStatus, SocksProbe
+from torproxy.queries import ProxyQueries
 from torproxy.service import ProxyService
 from torproxy.state import RuntimeState
 from torproxy.web.router import Router
@@ -37,3 +40,18 @@ def create_server(settings: Settings, address: tuple[str, int] | None = None) ->
         Router(create_services(settings)),
         settings,
     )
+
+
+def create_mcp_handler(settings: Settings, service: ProxyService | None = None) -> McpHandler:
+    svc = service or create_services(settings)
+    return McpHandler(svc, ProxyQueries(svc))
+
+
+def create_mcp_server(
+    settings: Settings,
+    handler: McpHandler | None = None,
+    address: tuple[str, int] | None = None,
+) -> McpSseServer:
+    h = handler or create_mcp_handler(settings)
+    addr = address or (settings.mcp_listen_address, settings.mcp_port)
+    return McpSseServer(addr, h, settings)

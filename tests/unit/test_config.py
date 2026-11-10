@@ -373,3 +373,47 @@ class TestGatewaySettings:
         rendered = render_torrc(settings, template)
         assert "TransPort" not in rendered
         assert "DNSPort" not in rendered
+
+
+@pytest.mark.unit
+class TestMcpSettings:
+    def test_default_mcp_settings(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping({})
+        assert s.mcp_enabled is True
+        assert s.mcp_port == 2501
+        assert s.mcp_listen_address == "0.0.0.0"
+
+    def test_custom_mcp_settings(self):
+        from torproxy.configuration import Settings
+
+        s = Settings.from_mapping(
+            {
+                "TORPROXY_MCP_ENABLED": "false",
+                "TORPROXY_MCP_PORT": "2502",
+                "TORPROXY_MCP_LISTEN_ADDRESS": "127.0.0.1",
+            }
+        )
+        assert s.mcp_enabled is False
+        assert s.mcp_port == 2502
+        assert s.mcp_listen_address == "127.0.0.1"
+
+    @pytest.mark.parametrize("invalid_port", ["0", "65536", "-1", "xyz"])
+    def test_invalid_mcp_port(self, invalid_port):
+        from torproxy.configuration import Settings
+
+        with pytest.raises(ValueError):
+            Settings.from_mapping({"TORPROXY_MCP_PORT": invalid_port})
+
+    def test_invalid_mcp_listen_address(self):
+        from torproxy.configuration import Settings
+
+        with pytest.raises(ValueError, match="TORPROXY_MCP_LISTEN_ADDRESS"):
+            Settings.from_mapping({"TORPROXY_MCP_LISTEN_ADDRESS": "not-an-ip"})
+
+    def test_mcp_port_collision_with_api_port(self):
+        from torproxy.configuration import Settings
+
+        with pytest.raises(ValueError, match="distinct ports"):
+            Settings.from_mapping({"TORPROXY_MCP_PORT": "8080"})

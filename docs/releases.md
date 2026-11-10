@@ -91,6 +91,12 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.6.0 (Model Context Protocol server & torproxy_fetch)
+
+- **Integrated MCP Server (ISSUE-122, PR #123):** Built-in zero-dependency Model Context Protocol (MCP) server running on port `2501` (HTTP/SSE) and via Stdio (`torproxy mcp`), enabling autonomous AI agents (Claude Desktop, Cursor, Antigravity) to orchestrate Tor circuits and inspect status.
+- **Native `torproxy_fetch`:** Zero-config HTTP/HTTPS and `.onion` fetching routed strictly through Tor without host proxy configuration or clearnet leaks.
+- **Canary verification:** Daily live canary suite now verifies `torproxy_fetch` against `check.torproject.org` with runner host IP leak detection.
+
 ### 2.5.0 (Feature roadmap follow-ups: TLS example, IPv6, SOCKS policy)
 
 - **GeoIP User-Agent fix (ISSUE-20 regression, #113, PR #114):** the GeoIP downloader no longer sends the custom `torproxy-geoip/1` User-Agent — GitLab answers raw files only to known UA patterns (`curl/*`, `Python-urllib/*`) with HTTP 403 for custom UAs. The daily canary failure is fixed; fallback to the bundled database was already working.

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-11-10
+
+### Added
+- **mcp**: Integrated Model Context Protocol (MCP) server on port 2501 and Stdio transport (ISSUE-122, #123)
+- **mcp**: Zero-config `torproxy_fetch` tool for leak-free HTTP/HTTPS and `.onion` fetches
+- **canary**: Add live MCP server and `torproxy_fetch` verification to canary and container tests
+
 ## [2.1.1] — 2026-11-07
 
 ### Fixed
@@ -184,7 +191,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/hapheus/torproxy/compare/v2.5.0...v2.6.0
 [2.1.1]: https://github.com/hapheus/torproxy/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/hapheus/torproxy/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/hapheus/torproxy/compare/v2.0.1...v2.0.2

@@ -86,6 +86,10 @@ class Settings:
     # isolation, never a credential check — so source-IP policy
     # is the strongest access control Tor itself offers.
     socks_allowed_cidrs: str = ""
+    # ISSUE-122: integrated Model Context Protocol (MCP) server
+    mcp_enabled: bool = True
+    mcp_port: int = 2501
+    mcp_listen_address: str = "0.0.0.0"
 
     def __post_init__(self) -> None:
         # ISSUE-18b (#107): IPv4 and IPv6 listen addresses are
@@ -98,12 +102,18 @@ class Settings:
             ipaddress.ip_address(self.api_listen_address)
         except ValueError:
             raise ValueError("TORPROXY_API_LISTEN_ADDRESS must be a valid IP address") from None
+        try:
+            ipaddress.ip_address(self.mcp_listen_address)
+        except ValueError:
+            raise ValueError("TORPROXY_MCP_LISTEN_ADDRESS must be a valid IP address") from None
         ports_to_check = [
             ("TORPROXY_LISTEN_PORT", self.proxy_port),
             ("TORPROXY_API_PORT", self.api_port),
             ("TORPROXY_SOCKS_PORT", self.socks_port),
             ("TOR_CONTROL_PORT", self.control_port),
         ]
+        if self.mcp_enabled:
+            ports_to_check.append(("TORPROXY_MCP_PORT", self.mcp_port))
         if self.gateway_mode:
             ports_to_check.extend(
                 [
@@ -178,6 +188,10 @@ class Settings:
         raw_gw = env.get("TORPROXY_GATEWAY_MODE", "0").strip().lower()
         gateway_mode = raw_gw in ("1", "true", "yes")
 
+        raw_mcp = env.get("TORPROXY_MCP_ENABLED", "1").strip().lower()
+        mcp_enabled = raw_mcp in ("1", "true", "yes")
+        mcp_listen_address = env.get("TORPROXY_MCP_LISTEN_ADDRESS", "0.0.0.0")
+
         geoip_auto, error = validate_strict_nodes_input(
             env.get("TORPROXY_GEOIP_AUTO_UPDATE") or None
         )
@@ -239,6 +253,9 @@ class Settings:
                 int(env.get("TORPROXY_GEOIP_MAX_BYTES", str(32 * 1024 * 1024))),
             ),
             socks_allowed_cidrs=env.get("TORPROXY_SOCKS_ALLOWED_CIDRS", "").strip(),
+            mcp_enabled=mcp_enabled,
+            mcp_port=port("TORPROXY_MCP_PORT", 2501),
+            mcp_listen_address=mcp_listen_address,
         )
 
 
