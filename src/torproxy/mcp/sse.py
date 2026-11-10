@@ -145,6 +145,7 @@ class McpSseHandler(BaseHTTPRequestHandler):
                     self.wfile.write(b": ping\r\n\r\n")
                     self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
+            # Client disconnected or socket closed; terminate SSE stream gracefully
             pass
         finally:
             self.server.remove_session(session_id)
