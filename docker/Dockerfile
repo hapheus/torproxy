@@ -7,7 +7,7 @@ ARG PYTHON_VERSION=3.14
 
 LABEL org.opencontainers.image.title="torproxy" \
       org.opencontainers.image.description="A minimal HTTP proxy routed through Tor" \
-      org.opencontainers.image.version="2.5.0" \
+      org.opencontainers.image.version="2.6.0" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://github.com/hapheus/torproxy" \
       org.opencontainers.image.url="https://github.com/hapheus/torproxy"
