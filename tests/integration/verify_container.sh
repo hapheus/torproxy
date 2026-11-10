@@ -72,8 +72,8 @@ echo "$LEGACY_RESP" | jq -e '.action == "reconnect" and .status == "success"' >/
 echo "✅ REST API contracts verified."
 
 echo "=== 3b. MCP Server Verification ==="
-# Test MCP Stdio ping & tools/list
-MCP_STDIO_RESP=$(echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | docker exec -i "$CONTAINER_NAME" python3 -m torproxy mcp 2>/dev/null)
+# Test MCP Stdio ping via documented CLI binary ('torproxy mcp') & python module
+MCP_STDIO_RESP=$(echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | docker exec -i "$CONTAINER_NAME" torproxy mcp 2>/dev/null)
 echo "MCP stdio ping response: $MCP_STDIO_RESP"
 echo "$MCP_STDIO_RESP" | jq -e '.result == {}' >/dev/null
 
@@ -84,7 +84,12 @@ echo "$MCP_TOOLS_RESP" | jq -e '.result.tools | map(.name) | contains(["torproxy
 SSE_ENDPOINT_RESP=$(docker exec "$CONTAINER_NAME" curl -fsS --max-time 3 http://127.0.0.1:2501/sse 2>/dev/null | head -n 2 || true)
 echo "MCP SSE endpoint response: $SSE_ENDPOINT_RESP"
 echo "$SSE_ENDPOINT_RESP" | grep -q "event: endpoint"
-echo "✅ MCP Server (stdio & SSE port 2501) verified."
+
+# Test MCP Streamable HTTP POST on internal port 2501
+STREAMABLE_RESP=$(docker exec "$CONTAINER_NAME" curl -fsS --max-time 5 -X POST http://127.0.0.1:2501/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":3,"method":"ping"}' 2>/dev/null)
+echo "MCP Streamable HTTP response: $STREAMABLE_RESP"
+echo "$STREAMABLE_RESP" | jq -e '.result == {}' >/dev/null
+echo "✅ MCP Server (stdio CLI, SSE & Streamable HTTP on port 2501) verified."
 
 echo "=== 4. SOCKS5 Handshake Verification ==="
 # Send RFC1928 greeting: \x05\x01\x00 (Version 5, 1 auth method, NO AUTH)

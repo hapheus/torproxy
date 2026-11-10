@@ -94,6 +94,12 @@ class TestGatewayRules:
         assert any("--to-ports 9055" in c for c in commands)
         assert any("--uid-owner customuser" in c for c in commands)
 
+    def test_mcp_port_exempt_in_gateway_rules(self):
+        rules = generate_iptables_rules(trans_port=9040, dns_port=9053, tor_user="tor")
+        commands = [" ".join(cmd) for cmd in rules]
+        assert any("nat -A PREROUTING -p tcp --dport 2501 -j RETURN" in c for c in commands)
+        assert any("-A INPUT -p tcp --dport 2501 -j ACCEPT" in c for c in commands)
+
 
 @pytest.mark.unit
 class TestGatewayLifecycle:

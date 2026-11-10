@@ -417,3 +417,10 @@ class TestMcpSettings:
 
         with pytest.raises(ValueError, match="distinct ports"):
             Settings.from_mapping({"TORPROXY_MCP_PORT": "8080"})
+
+    def test_dockerfile_installs_torproxy_cli_binary(self):
+        from pathlib import Path
+
+        dockerfile = Path("docker/Dockerfile").read_text(encoding="utf-8")
+        assert "/usr/local/bin/torproxy" in dockerfile
+        assert "torproxy --version" in dockerfile

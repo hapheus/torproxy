@@ -51,8 +51,11 @@ RUN SITE_PACKAGES="$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["
     && mkdir -p "$SITE_PACKAGES" \
     && cp -a /app/torproxy-src "$SITE_PACKAGES/torproxy" \
     && cp /app/pyproject.toml "$SITE_PACKAGES/pyproject.toml" \
+    && printf '#!/usr/bin/env python3\nimport sys\nfrom torproxy.runtime.cli import main\nif __name__ == "__main__":\n    sys.exit(main())\n' > /usr/local/bin/torproxy \
+    && chmod 0755 /usr/local/bin/torproxy \
     && rm -rf /app \
-    && python3 -c "import torproxy; print(f'torproxy {torproxy.__version__} import OK on Python ' + __import__('sys').version)"
+    && python3 -c "import torproxy; print(f'torproxy {torproxy.__version__} import OK on Python ' + __import__('sys').version)" \
+    && torproxy --version
 COPY --chmod=755 docker/start.sh /usr/local/bin/start.sh
 COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/healthcheck.sh
 COPY --chmod=644 docker/privoxy.config.template /etc/privoxy/config.template

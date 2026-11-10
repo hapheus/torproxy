@@ -11,6 +11,27 @@ from torproxy.queries import ProxyQueries
 from torproxy.service import ControlFailure, InvalidInput, ProxyService
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
+SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-03-26", "2025-06-18")
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        parsed = urllib.parse.urlparse(newurl)
+        if parsed.scheme not in ("http", "https"):
+            raise urllib.error.URLError(
+                f"Unsupported redirect URL scheme '{parsed.scheme}'. "
+                "Only http and https are allowed."
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
 
 TOOLS_SCHEMA: list[dict[str, Any]] = [
     {
@@ -193,11 +214,17 @@ class McpHandler:
             return None
 
         if method == "initialize":
+            client_version = params.get("protocolVersion")
+            negotiated_version = (
+                client_version
+                if isinstance(client_version, str) and client_version in SUPPORTED_PROTOCOL_VERSIONS
+                else MCP_PROTOCOL_VERSION
+            )
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {
-                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "protocolVersion": negotiated_version,
                     "capabilities": {
                         "tools": {},
                         "resources": {},
@@ -211,6 +238,12 @@ class McpHandler:
 
         if method == "ping":
             return {"jsonrpc": "2.0", "id": req_id, "result": {}}
+
+        if method == "prompts/list":
+            return {"jsonrpc": "2.0", "id": req_id, "result": {"prompts": []}}
+
+        if method == "resources/templates/list":
+            return {"jsonrpc": "2.0", "id": req_id, "result": {"resourceTemplates": []}}
 
         if method == "tools/list":
             return {
@@ -271,7 +304,7 @@ class McpHandler:
         if name in ("torproxy_reconnect", "torproxy_connect"):
             action = "reconnect" if name == "torproxy_reconnect" else "connect"
             country = args.get("country")
-            strict = args.get("strict")
+            strict = args.get("strict") if "strict" in args else args.get("strict_nodes")
             try:
                 res = self.service.mutate(action, country=country, strict=strict)
                 return {
@@ -391,17 +424,21 @@ class McpHandler:
 
         try:
             timeout = float(args.get("timeout", 30))
+            if timeout <= 0:
+                timeout = 30.0
         except (ValueError, TypeError):
             timeout = 30.0
 
         try:
             max_bytes = int(args.get("max_bytes", 1048576))
+            if max_bytes <= 0:
+                max_bytes = 1048576
         except (ValueError, TypeError):
             max_bytes = 1048576
 
         proxy_url = f"http://127.0.0.1:{self.service.settings.proxy_port}"
         proxy_handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
-        opener = urllib.request.build_opener(proxy_handler)
+        opener = urllib.request.build_opener(proxy_handler, _SafeRedirectHandler())
 
         req = urllib.request.Request(raw_url, data=data, headers=headers, method=method)
 

@@ -230,3 +230,63 @@ def test_sse_post_payload_too_large(running_sse_server):
         urllib.request.urlopen(post_req)
     assert exc_info.value.code == 413
     stream_resp.close()
+
+
+@pytest.mark.unit
+def test_sse_query_token_authenticated_session_can_post_messages(running_sse_server):
+    _, base_url = running_sse_server({"TORPROXY_API_TOKEN": "topsecret"})
+
+    # Connect via query parameter only (as EventSource / URL-only MCP clients do)
+    resp = urllib.request.urlopen(f"{base_url}/sse?token=topsecret")
+    line1 = resp.readline().decode().strip()
+    line2 = resp.readline().decode().strip()
+    resp.readline()
+    assert line1 == "event: endpoint"
+    endpoint_path = line2.split("data: ")[1].strip()
+
+    # Client resolves endpoint relative to base URL (which strips ?token=topsecret)
+    post_url = f"{base_url}{endpoint_path}"
+    body = json.dumps({"jsonrpc": "2.0", "id": "auth-1", "method": "ping"}).encode()
+    post_req = urllib.request.Request(
+        post_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    with urllib.request.urlopen(post_req) as post_resp:
+        assert post_resp.status in (200, 202)
+
+    ev_line = resp.readline().decode().strip()
+    data_line = resp.readline().decode().strip()
+    resp.readline()
+    assert ev_line == "event: message"
+    msg_data = json.loads(data_line.split("data: ")[1])
+    assert msg_data["id"] == "auth-1"
+    assert msg_data["result"] == {}
+    resp.close()
+
+
+@pytest.mark.unit
+def test_streamable_http_post_on_sse_and_mcp_paths(running_sse_server):
+    _, base_url = running_sse_server()
+
+    for path in ("/sse", "/mcp", "/"):
+        body = json.dumps({"jsonrpc": "2.0", "id": "s-1", "method": "ping"}).encode()
+        req = urllib.request.Request(
+            f"{base_url}{path}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data == {"jsonrpc": "2.0", "id": "s-1", "result": {}}
+
+    # Notification over Streamable HTTP returns 202 Accepted
+    notif = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}).encode()
+    notif_req = urllib.request.Request(
+        f"{base_url}/mcp",
+        data=notif,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(notif_req) as resp:
+        assert resp.status == 202
