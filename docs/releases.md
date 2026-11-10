@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.2 (MCP Registry automated publishing workflow)
+
+- **Automated MCP Registry Publish (#134, #135):** Added `.github/workflows/publish-mcp.yml` using GitHub Actions OIDC (`id-token: write`) to automatically publish the verified `server.json` to `registry.modelcontextprotocol.io` upon pushing release tags (`v*`).
+
 ### 2.7.1 (Dependency and GitHub Actions updates)
 
 - **Dependency Updates (#130, #131):** Bumped `ruff` to 0.17.4 and updated GitHub Actions pin digests (CodeQL 4.39.3, docker/login-action 4.8.0, git-cliff-action 4.9.1, action-gh-release 3.0.4).

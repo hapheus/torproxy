@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.2] — 2026-11-10
+
+### Added
+- **ci**: Add automated GitHub Actions workflow to publish `server.json` to the official MCP Registry on release tags via GitHub OIDC (#134, #135)
+
 ## [2.7.1] — 2026-11-10
 
 ### Changed
@@ -218,7 +223,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.1...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.2...HEAD
+[2.7.2]: https://github.com/hapheus/torproxy/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/hapheus/torproxy/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/hapheus/torproxy/compare/v2.6.2...v2.7.0
 [2.6.2]: https://github.com/hapheus/torproxy/compare/v2.6.1...v2.6.2
