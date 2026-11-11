@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.5] — 2026-11-11
+
+### Added
+- **mcp**: Add root-level auto-discovery manifests `.mcp.json` (Cursor & cursor.directory) and `smithery.yaml` (Smithery.ai) for zero-config import and live healthcheck (#143)
+
 ## [2.7.4] — 2026-11-10
 
 ### Fixed
@@ -235,7 +240,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.4...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.5...HEAD
+[2.7.5]: https://github.com/hapheus/torproxy/compare/v2.7.4...v2.7.5
 [2.7.4]: https://github.com/hapheus/torproxy/compare/v2.7.3...v2.7.4
 [2.7.3]: https://github.com/hapheus/torproxy/compare/v2.7.2...v2.7.3
 [2.7.2]: https://github.com/hapheus/torproxy/compare/v2.7.1...v2.7.2
