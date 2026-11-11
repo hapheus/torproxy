@@ -328,6 +328,37 @@ class TestEnvironmentAndDefaultsContract:
                 if pkg.get("registryType") == "oci":
                     assert pkg["identifier"].endswith(f":{project_version}")
 
+    def test_mcp_auto_discovery_manifests_contract(self):
+        # ISSUE-143: verify .mcp.json and smithery.yaml auto-discovery manifests
+        mcp_json_path = os.path.join(REPO_ROOT, ".mcp.json")
+        assert os.path.exists(mcp_json_path), ".mcp.json must exist in repository root"
+        with open(mcp_json_path, "r", encoding="utf-8") as f:
+            mcp_data = json.load(f)
+        assert "mcpServers" in mcp_data
+        assert "torproxy" in mcp_data["mcpServers"]
+        server_cfg = mcp_data["mcpServers"]["torproxy"]
+        assert server_cfg["command"] == "docker"
+        assert server_cfg["args"] == [
+            "run",
+            "-i",
+            "--rm",
+            "--entrypoint",
+            "torproxy",
+            "hapheus/torproxy:latest",
+            "mcp",
+        ]
+
+        smithery_path = os.path.join(REPO_ROOT, "smithery.yaml")
+        assert os.path.exists(smithery_path), "smithery.yaml must exist in repository root"
+        with open(smithery_path, "r", encoding="utf-8") as f:
+            smithery_content = f.read()
+        assert "startCommand:" in smithery_content
+        assert "type: stdio" in smithery_content
+        assert "configSchema:" in smithery_content
+        assert "commandFunction:" in smithery_content
+        assert "hapheus/torproxy:latest" in smithery_content
+        assert "--entrypoint" in smithery_content
+
     def test_compiled_artifacts_ignored_everywhere(self):
         # ISSUE-16: no .pyc/__pycache__ may leak into the repo or the image.
         gitignore_path = os.path.join(REPO_ROOT, ".gitignore")

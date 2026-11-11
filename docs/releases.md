@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.5 (MCP Auto-Discovery Manifests for Cursor and Smithery.ai)
+
+- **Cursor & Smithery.ai Manifests (#143):** Added root-level auto-discovery manifest files `.mcp.json` and `smithery.yaml`, enabling zero-config integration in Cursor / cursor.directory and automated live-healthcheck evaluation on Smithery.ai.
+
 ### 2.7.4 (MCP Registry OCI label requirement and live bootstrap resilience)
 
 - **MCP Registry OCI Label & Annotations (#141):** Added `LABEL io.modelcontextprotocol.server.name="io.github.hapheus/torproxy"` to `docker/Dockerfile` and OCI index/manifest annotations in `publish-dockerhub.yml`, satisfying the official MCP Registry verification requirement for OCI container packages.
