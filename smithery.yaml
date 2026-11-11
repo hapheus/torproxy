@@ -1,0 +1,25 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      torproxyApiToken:
+        type: string
+        description: "Optional secret token for authenticating REST and MCP requests."
+  commandFunction: |-
+    (config) => ({
+      command: "docker",
+      args: [
+        "run",
+        "-i",
+        "--rm",
+        "--entrypoint",
+        "torproxy",
+        ...(config?.torproxyApiToken ? ["-e", `TORPROXY_API_TOKEN=${config.torproxyApiToken}`] : []),
+        "hapheus/torproxy:latest",
+        "mcp"
+      ]
+    })
+  exampleConfig:
+    torproxyApiToken: ""

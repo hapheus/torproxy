@@ -92,6 +92,29 @@ Connect Claude Desktop to your running `torproxy` container over Stdio without e
 }
 ```
 
+#### Option C: Zero-Config Project Auto-Discovery (`.mcp.json`)
+The repository includes a root-level `.mcp.json` automatically detected by Cursor and [cursor.directory](https://cursor.directory) for on-demand execution:
+```json
+{
+  "mcpServers": {
+    "torproxy": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "--entrypoint", "torproxy", "hapheus/torproxy:latest", "mcp"]
+    }
+  }
+}
+```
+
+---
+
+### Smithery.ai Integration (`smithery.yaml`)
+
+`torproxy` includes a root-level `smithery.yaml` configuration allowing zero-config import, automated live-healthcheck validation, and one-click installation via [Smithery.ai](https://smithery.ai):
+
+```bash
+npx -y @smithery/cli install hapheus/torproxy --client claude
+```
+
 ---
 
 ### Antigravity & Gemini CLI (`settings.json`)

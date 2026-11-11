@@ -142,6 +142,14 @@ Connect via HTTP/SSE:
 }
 ```
 
+Or use the root-level `.mcp.json` manifest auto-detected by Cursor and [cursor.directory](https://cursor.directory) on workspace open.
+
+### Smithery.ai Integration (`smithery.yaml`)
+Install directly with zero configuration via [Smithery.ai](https://smithery.ai):
+```bash
+npx -y @smithery/cli install hapheus/torproxy --client claude
+```
+
 ### Key Tools Available to Agents
 - `torproxy_fetch`: **Zero-config fetch** — execute HTTP/HTTPS or `.onion` requests strictly routed through Tor (no local curl or host proxy setup needed).
 - `torproxy_status`: Retrieve live bootstrap progress, egress IP, and GeoIP metadata.
