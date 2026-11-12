@@ -248,7 +248,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.5...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.6...HEAD
+[2.7.6]: https://github.com/hapheus/torproxy/compare/v2.7.5...v2.7.6
 [2.7.5]: https://github.com/hapheus/torproxy/compare/v2.7.4...v2.7.5
 [2.7.4]: https://github.com/hapheus/torproxy/compare/v2.7.3...v2.7.4
 [2.7.3]: https://github.com/hapheus/torproxy/compare/v2.7.2...v2.7.3
