@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.6] — 2026-11-12
+
+### Changed
+- **docs**: Restructure README.md and DOCKERHUB.md with developer psychology, progressive disclosure, and 2-step quickstarts (#144, #145)
+- **docs**: Add quick-reference endpoint matrix to `docs/api.md` and key variables callout to `docs/configuration.md` (#145)
+- **docs**: Relocate MCP quickstart ahead of architecture details in `docs/mcp.md` (#145)
+- **chore**: Synchronize version 2.7.6 across pyproject.toml, Dockerfile, server.json, and documentation contracts (#145)
+
 ## [2.7.5] — 2026-11-11
 
 ### Added
@@ -240,7 +248,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.5...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.6...HEAD
+[2.7.6]: https://github.com/hapheus/torproxy/compare/v2.7.5...v2.7.6
 [2.7.5]: https://github.com/hapheus/torproxy/compare/v2.7.4...v2.7.5
 [2.7.4]: https://github.com/hapheus/torproxy/compare/v2.7.3...v2.7.4
 [2.7.3]: https://github.com/hapheus/torproxy/compare/v2.7.2...v2.7.3

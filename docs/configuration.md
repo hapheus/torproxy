@@ -6,6 +6,16 @@ This guide provides the complete configuration reference for `torproxy`, includi
 
 All settings have sensible defaults that allow running `torproxy` with zero configuration. When running via Docker Compose or `docker run`, settings can be customized using environment variables.
 
+> 💡 **Quick Reference — Frequently Used Variables:**
+> - **Route through country:** `TORPROXY_COUNTRY=DE` (or `DE,AT`)
+> - **Enforce country strictly:** `TORPROXY_STRICT_NODES=1`
+> - **Enable Transparent Gateway:** `TORPROXY_GATEWAY_MODE=1`
+> - **Secure API with Bearer token:** `TORPROXY_API_TOKEN=your-token`
+> - **Automatic GeoIP database updates:** `TORPROXY_GEOIP_AUTO_UPDATE=1`
+> - **Enable AI Agent MCP (SSE):** `TORPROXY_MCP_ENABLED=1` (port `2501`)
+
+### Complete Settings Reference
+
 | Variable | Default | Type | Description |
 |---|---|---|---|
 | `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | IP address (IPv4 or IPv6, e.g. `::1`) | Address inside the container that Privoxy binds to. Set to `0.0.0.0` to permit container-to-container connections. |

@@ -15,11 +15,90 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hapheus/torproxy/badge)](https://scorecard.dev/viewer/?uri=github.com/hapheus/torproxy)
 [![OpenSSF Best Practices](https://img.shields.io/cii/percentage/15828?style=flat-square&logo=linuxfoundation&label=OpenSSF%20Best%20Practices)](https://www.bestpractices.dev/projects/15828)
 
-[Quick Start](#quick-start) · [Model Context Protocol (MCP)](#-model-context-protocol-mcp) · [Transparent Gateway](#transparent-tor-gateway) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
+[Quick Start](#quick-start) · [Transparent Gateway](#transparent-tor-gateway) · [Model Context Protocol (MCP)](#-model-context-protocol-mcp) · [Use Cases](#-when-to-use-torproxy) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
-A minimal, secure, and reliable Tor HTTP and SOCKS5 proxy packaged for Docker. `torproxy` routes traffic through the Tor network with fail-closed protection, non-root execution, an authenticated Tor control interface, and a lightweight JSON REST API for circuit rotation, health monitoring, and dynamic exit node routing.
+**A production-grade, leak-proof Tor HTTP and SOCKS5 proxy packaged for Docker.**
+Route entire container stacks without touching application code, equip AI coding assistants (Claude Desktop, Cursor) with native Tor tools via MCP, and rotate circuits dynamically with a single REST call.
+
+- 🛡️ **Zero Clearnet Leaks:** Fail-closed netfilter kill-switch & Privoxy fail-safe — never leaks your real IP on connection drops.
+- 🚀 **Transparent Tor Gateway:** Tunnel any container's TCP & DNS via `network_mode: "service:torproxy"` — zero app config changes.
+- 🤖 **Native AI Agent MCP Server:** Built-in Model Context Protocol server (SSE & Stdio) for Claude Desktop, Cursor, and Antigravity.
+- 🔄 **Dynamic Circuit & Country Control:** Switch identities (`SIGNAL NEWNYM`) and select exit node countries on the fly via REST.
+- 🔒 **Defense in Depth:** Runs strictly as an unprivileged user (`torproxy`), with ephemeral cookie authentication for Tor control.
+
+---
+
+## Quick Start
+
+Get up and running with a verified Tor circuit in seconds:
+
+### 1. Launch torproxy
+
+Clone and run via Docker Compose:
+```sh
+docker compose up -d
+```
+*Or launch directly via Docker Run without cloning:*
+```sh
+docker run -d --name torproxy --restart unless-stopped \
+  -p 127.0.0.1:8118:8118 -p 127.0.0.1:9050:9050 -p 127.0.0.1:8080:8080 \
+  hapheus/torproxy:latest
+```
+
+### 2. Verify Tor connectivity
+```sh
+# Verify HTTP proxy (returns {"IsTor": true, "IP": "..."})
+curl -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
+
+# Verify SOCKS5 proxy with remote DNS resolution
+curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+
+# Check live connection status via REST API
+curl -s http://127.0.0.1:8080/status | jq .
+```
+
+> [!IMPORTANT]
+> **Leak-Proof Guarantee (Fail-Closed):** If Tor disconnects or crashes, Privoxy immediately returns `503 Service Unavailable` and the Netfilter kill switch drops outgoing packets. Your real IP will **never** silently leak to clearnet under network failures.
+
+> **Security Note:** In `docker-compose.yml`, all ports bind strictly to `127.0.0.1` by default. Neither the proxy listeners nor the management API require authentication; do not expose them to untrusted networks.
+
+<details>
+<summary><b>⚡ Advanced: Dynamic Identity Rotation & Country Routing (click to expand)</b></summary>
+
+```sh
+# Request a fresh Tor identity without restarting the container:
+curl -X POST http://127.0.0.1:8080/reconnect
+
+# Switch exit country dynamically on reconnect:
+curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
+
+# Switch with strict exit country enforcement via JSON payload:
+curl -X POST http://127.0.0.1:8080/reconnect \
+  -H "Content-Type: application/json" \
+  -d '{"country": "AT", "strict_nodes": true}'
+
+# Or launch with a default country at startup:
+TORPROXY_COUNTRY=DE docker compose up -d
+```
+</details>
+
+---
+
+## 🎯 When to Use torproxy
+
+Understanding where `torproxy` excels helps you pick the right tool for the job:
+
+- ✅ **Ideal For:**
+  - **Automated Web Scraping & Data Extraction:** Distribute requests and bypass IP rate limits with dynamic circuit rotation.
+  - **AI Agent Automation (MCP):** Allow Claude Desktop, Cursor, and agent frameworks to fetch web and `.onion` pages safely.
+  - **Zero-Friction Container Privacy:** Tunnel third-party containers (crawlers, search engines, microservices) with zero code modifications.
+  - **Geolocation Verification:** Test localized web experiences and CDN geo-routing across different exit countries (`TORPROXY_COUNTRY=DE,AT,US`).
+  - **Self-Hosted Privacy Stacks:** Route upstream search queries (e.g. SearXNG) privately.
+- ⚠️ **Not Designed For:**
+  - **High-Bandwidth / Latency-Critical Traffic:** Tor is not designed for 4K video streaming, voice calls, or real-time gaming.
+  - **Bypassing Dedicated Anti-Bot Protection:** Major CDNs (e.g., Cloudflare, Akamai) often challenge or block known public Tor exit nodes.
 
 ---
 
@@ -44,38 +123,7 @@ Host Client / Dependent Containers
 
 ---
 
-## Quick Start
-
-```sh
-# 1. Start torproxy in the background
-docker compose up -d
-
-# 2. Test HTTP proxy (port 8118)
-curl -v -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
-
-# 3. Test SOCKS5 proxy with remote DNS resolution (port 9050)
-curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
-
-# 4. Check status via the local REST API
-curl http://127.0.0.1:8080/status
-
-# 5. Optional: Route exit traffic through a specific country (e.g. DE or AT)
-TORPROXY_COUNTRY=DE docker compose up -d
-# or multiple countries:
-TORPROXY_COUNTRY=DE,AT docker compose up -d
-
-# 6. Dynamically switch exit country on reconnect without container restart:
-curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
-# or with JSON payload:
-curl -X POST http://127.0.0.1:8080/reconnect \
-  -H "Content-Type: application/json" \
-  -d '{"country": "AT", "strict_nodes": true}'
-```
-
-> **Security Note:** In `docker-compose.yml`, all ports bind strictly to `127.0.0.1` by default. Neither the proxy listeners nor the management API require authentication; do not expose them to untrusted networks.
-
----
-
+<a id="transparent-tor-gateway"></a>
 ## 🚀 Transparent Tor Gateway
 
 Route **any** existing Docker container's entire outbound TCP and DNS traffic automatically through Tor — **without modifying your applications or adding proxy flags**.
@@ -218,35 +266,17 @@ services:
 
 ## Configuration
 
-Default settings require no configuration. You can customize listening ports and bindings via environment variables in a `.env` file or Compose `environment` section:
+Default settings work out-of-the-box with zero configuration. You can customize runtime behavior using environment variables in `.env` or Docker Compose:
 
-| Variable | Default | Allowed Values | Description |
-| -------- | ------- | -------------- | ----------- |
-| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Valid IPv4 | Bind address for Privoxy inside the container. |
-| `TORPROXY_LISTEN_PORT` | `8118` | `1024`–`65535` | HTTP proxy listening port inside the container. |
-| `TORPROXY_HOST_PORT` | `8118` | `1`–`65535` | Host port mapped to HTTP proxy in `docker-compose.yml`. |
-| `TORPROXY_API_PORT` | `8080` | `1024`–`65535` | REST API listening port (host and container). |
-| `TORPROXY_SOCKS_PORT` | `9050` | `1024`–`65535` | Tor SOCKS5 proxy port (host and container). |
-| `TORPROXY_COUNTRY` | *(unset)* | ISO 3166-1 alpha-2 (e.g. `DE`, `AT`, `US`, `DE,AT`) | Route Tor exit circuits through specific countries using `tor-geoipdb`. |
-| `TORPROXY_STRICT_NODES` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
-| `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Opt-in: periodically download Tor's GeoIP database (`geoip`/`geoip6`) from Tor Project GitLab and reload Tor. On failure the bundled/previous database keeps working. See [GeoIP auto-update](#geoip-auto-update). |
-| `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API port 8080. Recommended for production. |
-| `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | `0`, `1`, `true`, `false` | Optional: Allow unauthenticated `/health` probing when `TORPROXY_API_TOKEN` is set. |
-| `TORPROXY_GATEWAY_MODE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Enable Transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
-| `TORPROXY_TRANS_PORT` | `9040` | `1024`–`65535` | Listening port for Tor TransPort when gateway mode is enabled. |
-| `TORPROXY_DNS_PORT` | `9053` | `1024`–`65535` | Listening port for Tor DNSPort when gateway mode is enabled. |
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| `TORPROXY_COUNTRY` | *(unset)* | Restrict exit nodes to specific countries (e.g. `DE`, `AT`, `US`, `DE,AT`). |
+| `TORPROXY_STRICT_NODES` | `0` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
+| `TORPROXY_GATEWAY_MODE` | `0` | Enable Transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
+| `TORPROXY_API_TOKEN` | *(unset)* | Bearer token / API key securing REST API port `8080`. Recommended for production. |
+| `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | Opt-in: periodically download and refresh Tor's GeoIP database from Tor Project GitLab. |
 
-All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
-
-### GeoIP Auto-Update
-
-By default `torproxy` uses the Tor GeoIP database bundled with the Alpine Tor package (`/usr/share/tor/geoip{,6}`), which is only refreshed when the Docker image is rebuilt. To keep country routing (`TORPROXY_COUNTRY=DE`) on a fresh IP-to-country mapping, enable the opt-in auto-update:
-
-```sh
-TORPROXY_GEOIP_AUTO_UPDATE=1 TORPROXY_COUNTRY=DE docker compose up -d
-```
-
-With `TORPROXY_GEOIP_AUTO_UPDATE=1` the container downloads `geoip`/`geoip6` from Tor Project GitLab (HTTPS) at startup and then every `TORPROXY_GEOIP_UPDATE_INTERVAL` seconds (default `86400` = 24h), validates the format, installs the files atomically into `TORPROXY_GEOIP_DIR` (default `/var/lib/tor/geoip`), and sends Tor `SIGHUP` to reload them. If the download or validation fails (e.g. offline or upstream unavailable), the previously installed — or bundled — database keeps working, so an old version never breaks country routing. Each attempt is recorded and exposed additively as `geoip` in `/status`, so a silent fallback is visible. The pre-publish Live Image Verification gate checks that the GeoIP URLs are reachable and that a container with auto-update enabled downloads the database; the Daily Live Image Verification workflow repeats this as a drift detector. Additional settings: `TORPROXY_GEOIP_URL`, `TORPROXY_GEOIP6_URL`, `TORPROXY_GEOIP_MAX_BYTES`, `TORPROXY_GEOIP6_MAX_BYTES`.
+> 📖 **Full Configuration Reference:** See [docs/configuration.md](docs/configuration.md) for custom listening ports (`TORPROXY_LISTEN_PORT`, `TORPROXY_SOCKS_PORT`, `TORPROXY_API_PORT`), address binding rules, and GeoIP update parameters.
 
 ---
 

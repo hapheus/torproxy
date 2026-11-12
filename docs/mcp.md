@@ -4,25 +4,7 @@
 
 ---
 
-## 1. Architecture & Dual-Transport Support
-
-The MCP server adheres strictly to the `torproxy` zero-dependency standard (using pure Python standard library: `http.server`, `json`, `threading`, `queue`).
-
-It supports two distinct transport protocols:
-
-1. **Stdio Transport (`torproxy mcp`):**
-   - Designed for local processes and container execution: `docker exec -i torproxy torproxy mcp`.
-   - Communicates using newline-delimited JSON-RPC 2.0 frames over `stdin` and `stdout`.
-   - All internal diagnostics and operational warnings are directed to `stderr` to maintain clean protocol isolation.
-   - Recommended for **Claude Desktop**.
-2. **HTTP/SSE & Streamable HTTP Transport (Port 2501):**
-   - Runs as a non-blocking daemon thread on port `2501` (`TORPROXY_MCP_PORT=2501`).
-   - Supports both **HTTP/SSE** (`GET /sse` or `GET /mcp` for Server-Sent Events stream initialization + `POST /messages?sessionId=...` for JSON-RPC dispatch) and **Streamable HTTP** (direct JSON-RPC `POST` to `/mcp`, `/sse`, or `/`).
-   - Recommended for **Cursor**, **Antigravity**, and remote container orchestrators.
-
----
-
-## 2. Quickstart Configuration Examples
+## 1. Quickstart Configuration Examples
 
 ### Claude Desktop (`claude_desktop_config.json`)
 
@@ -153,6 +135,24 @@ services:
       # Optional:
       # - TORPROXY_API_TOKEN=your-token
 ```
+
+---
+
+## 2. Architecture & Dual-Transport Support
+
+The MCP server adheres strictly to the `torproxy` zero-dependency standard (using pure Python standard library: `http.server`, `json`, `threading`, `queue`).
+
+It supports two distinct transport protocols:
+
+1. **Stdio Transport (`torproxy mcp`):**
+   - Designed for local processes and container execution: `docker exec -i torproxy torproxy mcp`.
+   - Communicates using newline-delimited JSON-RPC 2.0 frames over `stdin` and `stdout`.
+   - All internal diagnostics and operational warnings are directed to `stderr` to maintain clean protocol isolation.
+   - Recommended for **Claude Desktop**.
+2. **HTTP/SSE & Streamable HTTP Transport (Port 2501):**
+   - Runs as a non-blocking daemon thread on port `2501` (`TORPROXY_MCP_PORT=2501`).
+   - Supports both **HTTP/SSE** (`GET /sse` or `GET /mcp` for Server-Sent Events stream initialization + `POST /messages?sessionId=...` for JSON-RPC dispatch) and **Streamable HTTP** (direct JSON-RPC `POST` to `/mcp`, `/sse`, or `/`).
+   - Recommended for **Cursor**, **Antigravity**, and remote container orchestrators.
 
 ---
 

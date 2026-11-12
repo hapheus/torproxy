@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.6 (Developer Experience, Behavioral Psychology & Documentation Optimization)
+
+- **Documentation & DX Optimization (#144, #145):** Restructured `README.md`, `DOCKERHUB.md`, and `/docs` using developer psychology, cognitive load reduction (Hick's Law), and progressive disclosure. Added instant 2-step verification, zero-clone `docker run` quickstarts, honest boundaries ("When to use / when not to use"), explicit fail-closed guarantees, and rapid-navigation matrices across `docs/api.md` and `docs/configuration.md`.
+- **Single Source of Truth Synchronization:** Synchronized version 2.7.6 across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `docs/releases.md`, and `CHANGELOG.md`.
+
 ### 2.7.5 (MCP Auto-Discovery Manifests for Cursor and Smithery.ai)
 
 - **Cursor & Smithery.ai Manifests (#143):** Added root-level auto-discovery manifest files `.mcp.json` and `smithery.yaml`, enabling zero-config integration in Cursor / cursor.directory and automated live-healthcheck evaluation on Smithery.ai.
