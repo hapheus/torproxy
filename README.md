@@ -15,11 +15,82 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hapheus/torproxy/badge)](https://scorecard.dev/viewer/?uri=github.com/hapheus/torproxy)
 [![OpenSSF Best Practices](https://img.shields.io/cii/percentage/15828?style=flat-square&logo=linuxfoundation&label=OpenSSF%20Best%20Practices)](https://www.bestpractices.dev/projects/15828)
 
-[Quick Start](#quick-start) · [Model Context Protocol (MCP)](#-model-context-protocol-mcp) · [Transparent Gateway](#transparent-tor-gateway) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
+[Quick Start](#quick-start) · [Transparent Gateway](#transparent-tor-gateway) · [Model Context Protocol (MCP)](#-model-context-protocol-mcp) · [Use Cases](#-when-to-use-torproxy) · [Architecture](#architecture) · [REST API](docs/api.md) · [Configuration](docs/configuration.md) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
-A minimal, secure, and reliable Tor HTTP and SOCKS5 proxy packaged for Docker. `torproxy` routes traffic through the Tor network with fail-closed protection, non-root execution, an authenticated Tor control interface, and a lightweight JSON REST API for circuit rotation, health monitoring, and dynamic exit node routing.
+**A production-grade, leak-proof Tor HTTP and SOCKS5 proxy packaged for Docker.**
+Route entire container stacks without touching application code, equip AI coding assistants (Claude Desktop, Cursor) with native Tor tools via MCP, and rotate circuits dynamically with a single REST call.
+
+- 🛡️ **Zero Clearnet Leaks:** Fail-closed netfilter kill-switch & Privoxy fail-safe — never leaks your real IP on connection drops.
+- 🚀 **Transparent Tor Gateway:** Tunnel any container's TCP & DNS via `network_mode: "service:torproxy"` — zero app config changes.
+- 🤖 **Native AI Agent MCP Server:** Built-in Model Context Protocol server (SSE & Stdio) for Claude Desktop, Cursor, and Antigravity.
+- 🔄 **Dynamic Circuit & Country Control:** Switch identities (`SIGNAL NEWNYM`) and select exit node countries on the fly via REST.
+- 🔒 **Defense in Depth:** Runs strictly as an unprivileged user (`torproxy`), with ephemeral cookie authentication for Tor control.
+
+---
+
+## Quick Start
+
+Get up and running with a verified Tor circuit in seconds:
+
+### 1. Launch torproxy
+```sh
+docker compose up -d
+```
+
+### 2. Verify Tor connectivity
+```sh
+# Verify HTTP proxy (Privoxy on :8118)
+curl -v -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
+
+# Verify SOCKS5 proxy with remote DNS resolution (Tor on :9050)
+curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+
+# Check live connection status via REST API (:8080)
+curl http://127.0.0.1:8080/status
+```
+
+> [!IMPORTANT]
+> **Leak-Proof Guarantee (Fail-Closed):** If Tor disconnects or crashes, Privoxy immediately returns `503 Service Unavailable` and the Netfilter kill switch drops outgoing packets. Your real IP will **never** silently leak to clearnet under network failures.
+
+> **Security Note:** In `docker-compose.yml`, all ports bind strictly to `127.0.0.1` by default. Neither the proxy listeners nor the management API require authentication; do not expose them to untrusted networks.
+
+<details>
+<summary><b>⚡ Advanced: Dynamic Identity Rotation & Country Routing (click to expand)</b></summary>
+
+```sh
+# Request a fresh Tor identity without restarting the container:
+curl -X POST http://127.0.0.1:8080/reconnect
+
+# Switch exit country dynamically on reconnect:
+curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
+
+# Switch with strict exit country enforcement via JSON payload:
+curl -X POST http://127.0.0.1:8080/reconnect \
+  -H "Content-Type: application/json" \
+  -d '{"country": "AT", "strict_nodes": true}'
+
+# Or launch with a default country at startup:
+TORPROXY_COUNTRY=DE docker compose up -d
+```
+</details>
+
+---
+
+## 🎯 When to Use torproxy
+
+Understanding where `torproxy` excels helps you pick the right tool for the job:
+
+- ✅ **Ideal For:**
+  - **Automated Web Scraping & Data Extraction:** Distribute requests and bypass IP rate limits with dynamic circuit rotation.
+  - **AI Agent Automation (MCP):** Allow Claude Desktop, Cursor, and agent frameworks to fetch web and `.onion` pages safely.
+  - **Zero-Friction Container Privacy:** Tunnel third-party containers (crawlers, search engines, microservices) with zero code modifications.
+  - **Geolocation Verification:** Test localized web experiences and CDN geo-routing across different exit countries (`TORPROXY_COUNTRY=DE,AT,US`).
+  - **Self-Hosted Privacy Stacks:** Route upstream search queries (e.g. SearXNG) privately.
+- ⚠️ **Not Designed For:**
+  - **High-Bandwidth / Latency-Critical Traffic:** Tor is not designed for 4K video streaming, voice calls, or real-time gaming.
+  - **Bypassing Dedicated Anti-Bot Protection:** Major CDNs (e.g., Cloudflare, Akamai) often challenge or block known public Tor exit nodes.
 
 ---
 
@@ -44,38 +115,7 @@ Host Client / Dependent Containers
 
 ---
 
-## Quick Start
-
-```sh
-# 1. Start torproxy in the background
-docker compose up -d
-
-# 2. Test HTTP proxy (port 8118)
-curl -v -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
-
-# 3. Test SOCKS5 proxy with remote DNS resolution (port 9050)
-curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
-
-# 4. Check status via the local REST API
-curl http://127.0.0.1:8080/status
-
-# 5. Optional: Route exit traffic through a specific country (e.g. DE or AT)
-TORPROXY_COUNTRY=DE docker compose up -d
-# or multiple countries:
-TORPROXY_COUNTRY=DE,AT docker compose up -d
-
-# 6. Dynamically switch exit country on reconnect without container restart:
-curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
-# or with JSON payload:
-curl -X POST http://127.0.0.1:8080/reconnect \
-  -H "Content-Type: application/json" \
-  -d '{"country": "AT", "strict_nodes": true}'
-```
-
-> **Security Note:** In `docker-compose.yml`, all ports bind strictly to `127.0.0.1` by default. Neither the proxy listeners nor the management API require authentication; do not expose them to untrusted networks.
-
----
-
+<a id="transparent-tor-gateway"></a>
 ## 🚀 Transparent Tor Gateway
 
 Route **any** existing Docker container's entire outbound TCP and DNS traffic automatically through Tor — **without modifying your applications or adding proxy flags**.

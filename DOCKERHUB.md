@@ -3,43 +3,34 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/hapheus/torproxy)](https://hub.docker.com/r/hapheus/torproxy)
 [![Architectures](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-blue)](https://hub.docker.com/r/hapheus/torproxy)
+[![Non-Root: Enforced](https://img.shields.io/badge/Security-Non--Root-brightgreen)](https://github.com/hapheus/torproxy)
+[![Fail-Closed](https://img.shields.io/badge/Protection-Fail--Closed-success)](https://github.com/hapheus/torproxy)
+[![OpenSSF Best Practices](https://img.shields.io/cii/percentage/15828?logo=linuxfoundation&label=OpenSSF%20Best%20Practices)](https://www.bestpractices.dev/projects/15828)
 
-A lightweight, secure, and production-ready Docker container combining **Tor**, **Privoxy** (HTTP/HTTPS proxy), **SOCKS5**, and a local **REST control API**.
+**Production-grade, leak-proof Tor HTTP and SOCKS5 proxy packaged for Docker.**
+Route entire container networks with zero application changes, connect AI coding assistants (Claude Desktop, Cursor) via built-in MCP, and rotate circuits dynamically via REST.
 
 Source repository: [https://github.com/hapheus/torproxy](https://github.com/hapheus/torproxy)
 
 ---
 
-## Key Features
+## ⚡ Core Value & Features
 
-- **Transparent Tor Gateway**: Route any Docker container's entire TCP and DNS traffic automatically through Tor using `network_mode: "service:torproxy"` — zero app proxy configuration, fail-closed netfilter kill switch.
-- **HTTP/HTTPS Proxy (Port 8118)**: Powered by Privoxy, automatically resolving DNS lookups through Tor exit relays to prevent DNS leaks.
-- **SOCKS5 Proxy (Port 9050)**: Standard Tor SOCKS5 interface supporting remote hostname resolution (`socks5h://`).
-- **REST Control API (Port 8080)**: Inspect circuit status, trigger circuit rotation (`/reconnect`), query health diagnostics, and pull Prometheus metrics.
-- **Fail-Closed Security**: Privoxy strictly routes to Tor SOCKS5; if Tor circuits drop, proxy requests fail immediately (500/503) rather than leaking to clearnet.
-- **Authenticated Tor Control**: Local Tor ControlPort is secured using ephemeral 32-byte filesystem cookie authentication.
-- **Non-Root Execution**: Runs under a dedicated, unprivileged system user (`torproxy`), never as root.
-- **Multi-Architecture**: Built natively for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
-- **Country-Specific Exit Nodes**: Route traffic through exit relays in specific countries (e.g. `TORPROXY_COUNTRY=DE` or `DE,AT`) backed by `tor-geoipdb`.
-- **Zero Breaking Changes**: Guaranteed backward compatibility across minor releases.
+- **🛡️ Zero Clearnet Leaks:** True fail-closed protection. If Tor disconnects, Privoxy and the netfilter kill-switch immediately drop traffic (HTTP 503) — your real IP is never exposed.
+- **🚀 Transparent Tor Gateway:** Attach any container via `network_mode: "service:torproxy"` to tunnel all outbound TCP & DNS through Tor automatically — zero app proxy flags or code changes.
+- **🤖 Native AI Agent MCP Server:** Built-in Model Context Protocol server on port `2501` (SSE) and via Stdio (`torproxy mcp`) for seamless Claude Desktop, Cursor, and Antigravity integration.
+- **🔄 Dynamic Circuit Rotation:** Rotate Tor identities (`SIGNAL NEWNYM`) or switch exit countries on the fly without container restarts via the REST API (`:8080`).
+- **🔒 Hardened Non-Root Security:** Daemons run strictly under an unprivileged user (`torproxy`), with authenticated loopback Tor ControlPort.
+- **🌍 Country-Specific Routing:** Select Tor exit relays by country (e.g. `TORPROXY_COUNTRY=DE` or `DE,AT`) backed by built-in `tor-geoipdb`.
+- **📦 Multi-Architecture:** Built natively for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
-### Option 1: Docker Run
+### Recommended: Docker Compose
 
-```bash
-docker run -d \
-  --name torproxy \
-  --restart unless-stopped \
-  -p 127.0.0.1:8118:8118 \
-  -p 127.0.0.1:9050:9050 \
-  -p 127.0.0.1:8080:8080 \
-  hapheus/torproxy:latest
-```
-
-### Option 2: Docker Compose
+Create a `docker-compose.yml`:
 
 ```yaml
 services:
@@ -48,25 +39,61 @@ services:
     container_name: torproxy
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8118:8118"
-      - "127.0.0.1:9050:9050"
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8118:8118"   # HTTP/HTTPS proxy (Privoxy)
+      - "127.0.0.1:9050:9050"   # SOCKS5 proxy (Tor)
+      - "127.0.0.1:8080:8080"   # REST API & Health status
 ```
 
-### Option 3: Country-Specific Exit Proxy (e.g. Germany or Austria)
+Launch the proxy:
+```bash
+docker compose up -d
+```
+
+### Alternative: Docker Run (Single Command)
 
 ```bash
 docker run -d \
   --name torproxy \
   --restart unless-stopped \
-  -e TORPROXY_COUNTRY=DE \
   -p 127.0.0.1:8118:8118 \
   -p 127.0.0.1:9050:9050 \
   -p 127.0.0.1:8080:8080 \
   hapheus/torproxy:latest
 ```
 
-### Option 4: Transparent Tor Gateway (Zero-Config Routing)
+---
+
+## 🧪 Verifying Tor Connectivity
+
+Wait a few seconds for Tor to finish bootstrapping, then test:
+
+```bash
+# 1. Test HTTP proxy via Privoxy (port 8118)
+curl --proxy http://127.0.0.1:8118 https://check.torproject.org/api/ip
+
+# 2. Test SOCKS5 proxy with remote DNS resolution (port 9050)
+curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+
+# 3. Check live connection status via REST API (port 8080)
+curl -s http://127.0.0.1:8080/status | jq .
+
+# 4. Request a new Tor identity / circuit on demand
+curl -X POST http://127.0.0.1:8080/reconnect
+
+# 5. Dynamically switch exit country without restarting
+curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
+```
+
+> [!IMPORTANT]
+> **Leak-Proof Guarantee (Fail-Closed):** If Tor fails or disconnects, `torproxy` fails closed immediately. It will **never** fall back to direct clearnet routing.
+
+---
+
+## 🌟 Popular Modes & Use Cases
+
+### 1. Transparent Gateway (Zero-Config Routing for Any Container)
+
+Route another container's entire network traffic (TCP + DNS) through Tor without setting proxy flags:
 
 ```yaml
 services:
@@ -79,7 +106,8 @@ services:
       TORPROXY_GATEWAY_MODE: "true"
     restart: unless-stopped
 
-  my-app:
+  # Any container attached to torproxy's network stack is automatically anonymized:
+  scraper:
     image: curlimages/curl:latest
     network_mode: "service:torproxy"
     depends_on:
@@ -88,27 +116,36 @@ services:
     command: ["-s", "https://check.torproject.org/api/ip"]
 ```
 
----
+### 2. AI Coding Assistants (Model Context Protocol / MCP)
 
-## Verifying Tor Connectivity
+Connect **Claude Desktop** directly via Docker Stdio without exposing host ports:
 
-Wait a few seconds for Tor to bootstrap, then test:
+```json
+{
+  "mcpServers": {
+    "torproxy": {
+      "command": "docker",
+      "args": ["exec", "-i", "torproxy", "torproxy", "mcp"]
+    }
+  }
+}
+```
+
+Or connect **Cursor** / **Antigravity** via HTTP/SSE (`http://127.0.0.1:2501/sse`).
+
+### 3. Country-Specific Exit Proxy
+
+Route traffic exclusively through specific countries:
 
 ```bash
-# 1. Check REST API status
-curl -s http://127.0.0.1:8080/status | jq .
-
-# 2. Test HTTP proxy via Privoxy
-curl --proxy http://127.0.0.1:8118 https://check.torproject.org/api/ip
-
-# 3. Test SOCKS5 proxy (using remote DNS to prevent leaks)
-curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
-
-# 4. Request a new Tor identity / circuit
-curl -X POST http://127.0.0.1:8080/reconnect
-
-# 5. Dynamically switch exit country without restart
-curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
+docker run -d \
+  --name torproxy \
+  --restart unless-stopped \
+  -e TORPROXY_COUNTRY=DE,AT \
+  -p 127.0.0.1:8118:8118 \
+  -p 127.0.0.1:9050:9050 \
+  -p 127.0.0.1:8080:8080 \
+  hapheus/torproxy:latest
 ```
 
 ---
