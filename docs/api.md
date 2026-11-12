@@ -22,6 +22,21 @@ The `torproxy` container includes an internal REST API server written in Python.
 
 ## 2. Endpoints
 
+### Quick Reference
+
+| Endpoint | Methods | Status Codes | Description |
+|---|---|---|---|
+| [`/status`, `/`](#get--post-status-or-) | `GET`, `POST` | `200`, `500` | Connection status and current verified exit IP. |
+| [`/ip`](#get--post-ip) | `GET`, `POST` | `200`, `503` | Current Tor egress IP (returns 503 while bootstrapping). |
+| [`/health`](#get--post-health-or-v1health) | `GET`, `POST` | `200`, `503` | Diagnostic health state across Tor, proxies, and egress. |
+| [`/reconnect`](#post--get-reconnect) | `POST`, `GET` | `200`, `400` | Request new circuit (`SIGNAL NEWNYM`); optional country change. |
+| [`/disconnect`](#post--get-disconnect) | `POST`, `GET` | `200` | Pause Tor network traffic (`DisableNetwork=1`). |
+| [`/connect`](#post--get-connect) | `POST`, `GET` | `200`, `400` | Resume Tor network traffic (`DisableNetwork=0`). |
+| [`/diagnostics`](#get--post-diagnostics-or-v1diagnostics) | `GET`, `POST` | `200` | Telemetry (uptime, reconnect counts, bootstrap progress). |
+| [`/metrics`](#get--post-metrics-or-v1metrics) | `GET`, `POST` | `200` | Prometheus exposition format metrics for scrapers. |
+
+---
+
 ### GET | POST `/status` (or `/`)
 Returns the current connection state and verified egress IP.
 

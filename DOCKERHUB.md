@@ -68,7 +68,7 @@ docker run -d \
 Wait a few seconds for Tor to finish bootstrapping, then test:
 
 ```bash
-# 1. Test HTTP proxy via Privoxy (port 8118)
+# 1. Test HTTP proxy via Privoxy (port 8118) — returns {"IsTor": true, "IP": "..."}
 curl --proxy http://127.0.0.1:8118 https://check.torproject.org/api/ip
 
 # 2. Test SOCKS5 proxy with remote DNS resolution (port 9050)
@@ -86,6 +86,19 @@ curl -X POST "http://127.0.0.1:8080/reconnect?country=DE"
 
 > [!IMPORTANT]
 > **Leak-Proof Guarantee (Fail-Closed):** If Tor fails or disconnects, `torproxy` fails closed immediately. It will **never** fall back to direct clearnet routing.
+
+---
+
+## 🎯 When to Use torproxy
+
+- ✅ **Ideal For:**
+  - Automated web scraping, data mining, and distributed crawling without IP rate limits.
+  - Empowering AI coding assistants (Claude Desktop, Cursor) with native `.onion` and web fetch tools via MCP.
+  - Zero-code privacy: Tunnel existing containers with `network_mode: "service:torproxy"`.
+  - Geolocation testing across exit countries (`TORPROXY_COUNTRY=DE,AT,US`).
+- ⚠️ **Not Designed For:**
+  - High-bandwidth 4K video streaming or latency-critical online gaming.
+  - Bypassing strict anti-bot protections (Cloudflare, Akamai) that systematically block public Tor exit relays.
 
 ---
 
@@ -174,12 +187,14 @@ The management API listens on port `8080` (HTTP):
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
-| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Bind address for Privoxy and Tor inside the container. |
-| `TORPROXY_LISTEN_PORT` | `8118` | Privoxy HTTP proxy port. |
-| `TORPROXY_SOCKS_PORT` | `9050` | Tor SOCKS5 proxy port. |
-| `TORPROXY_API_PORT` | `8080` | REST API port. |
 | `TORPROXY_COUNTRY` | *(unset)* | Comma-separated ISO 3166-1 alpha-2 codes (e.g. `DE`, `AT`, `US`, `DE,AT`) to restrict exit nodes. |
 | `TORPROXY_STRICT_NODES` | `0` | If `1`/`true`, refuse circuits if nodes in the requested country/countries are unavailable. |
+| `TORPROXY_GATEWAY_MODE` | `0` | Enable Transparent Tor Gateway mode (`cap_add: [NET_ADMIN]` required). |
+| `TORPROXY_API_TOKEN` | *(unset)* | Optional Bearer token / API key securing REST API port 8080. |
+| `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | Opt-in: periodically download fresh GeoIP database from Tor Project GitLab. |
+| `TORPROXY_LISTEN_PORT` | `8118` | Privoxy HTTP proxy port inside container. |
+| `TORPROXY_SOCKS_PORT` | `9050` | Tor SOCKS5 proxy port inside container. |
+| `TORPROXY_API_PORT` | `8080` | REST API port inside container. |
 
 ---
 

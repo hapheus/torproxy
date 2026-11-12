@@ -35,20 +35,28 @@ Route entire container stacks without touching application code, equip AI coding
 Get up and running with a verified Tor circuit in seconds:
 
 ### 1. Launch torproxy
+
+Clone and run via Docker Compose:
 ```sh
 docker compose up -d
+```
+*Or launch directly via Docker Run without cloning:*
+```sh
+docker run -d --name torproxy --restart unless-stopped \
+  -p 127.0.0.1:8118:8118 -p 127.0.0.1:9050:9050 -p 127.0.0.1:8080:8080 \
+  hapheus/torproxy:latest
 ```
 
 ### 2. Verify Tor connectivity
 ```sh
-# Verify HTTP proxy (Privoxy on :8118)
-curl -v -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
+# Verify HTTP proxy (returns {"IsTor": true, "IP": "..."})
+curl -x http://127.0.0.1:8118 https://check.torproject.org/api/ip
 
-# Verify SOCKS5 proxy with remote DNS resolution (Tor on :9050)
-curl -v --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+# Verify SOCKS5 proxy with remote DNS resolution
+curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
 
-# Check live connection status via REST API (:8080)
-curl http://127.0.0.1:8080/status
+# Check live connection status via REST API
+curl -s http://127.0.0.1:8080/status | jq .
 ```
 
 > [!IMPORTANT]
@@ -258,35 +266,17 @@ services:
 
 ## Configuration
 
-Default settings require no configuration. You can customize listening ports and bindings via environment variables in a `.env` file or Compose `environment` section:
+Default settings work out-of-the-box with zero configuration. You can customize runtime behavior using environment variables in `.env` or Docker Compose:
 
-| Variable | Default | Allowed Values | Description |
-| -------- | ------- | -------------- | ----------- |
-| `TORPROXY_LISTEN_ADDRESS` | `0.0.0.0` | Valid IPv4 | Bind address for Privoxy inside the container. |
-| `TORPROXY_LISTEN_PORT` | `8118` | `1024`–`65535` | HTTP proxy listening port inside the container. |
-| `TORPROXY_HOST_PORT` | `8118` | `1`–`65535` | Host port mapped to HTTP proxy in `docker-compose.yml`. |
-| `TORPROXY_API_PORT` | `8080` | `1024`–`65535` | REST API listening port (host and container). |
-| `TORPROXY_SOCKS_PORT` | `9050` | `1024`–`65535` | Tor SOCKS5 proxy port (host and container). |
-| `TORPROXY_COUNTRY` | *(unset)* | ISO 3166-1 alpha-2 (e.g. `DE`, `AT`, `US`, `DE,AT`) | Route Tor exit circuits through specific countries using `tor-geoipdb`. |
-| `TORPROXY_STRICT_NODES` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
-| `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Opt-in: periodically download Tor's GeoIP database (`geoip`/`geoip6`) from Tor Project GitLab and reload Tor. On failure the bundled/previous database keeps working. See [GeoIP auto-update](#geoip-auto-update). |
-| `TORPROXY_API_TOKEN` | *(unset)* | String | Optional: Bearer token / API key securing REST API port 8080. Recommended for production. |
-| `TORPROXY_API_ALLOW_ANONYMOUS_HEALTH` | `0` | `0`, `1`, `true`, `false` | Optional: Allow unauthenticated `/health` probing when `TORPROXY_API_TOKEN` is set. |
-| `TORPROXY_GATEWAY_MODE` | `0` | `0`, `1`, `true`, `false`, `yes`, `no` | Enable Transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
-| `TORPROXY_TRANS_PORT` | `9040` | `1024`–`65535` | Listening port for Tor TransPort when gateway mode is enabled. |
-| `TORPROXY_DNS_PORT` | `9053` | `1024`–`65535` | Listening port for Tor DNSPort when gateway mode is enabled. |
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| `TORPROXY_COUNTRY` | *(unset)* | Restrict exit nodes to specific countries (e.g. `DE`, `AT`, `US`, `DE,AT`). |
+| `TORPROXY_STRICT_NODES` | `0` | When `1`/`true`, reject circuits if configured country exit nodes are unavailable. |
+| `TORPROXY_GATEWAY_MODE` | `0` | Enable Transparent Tor Gateway mode (`TransPort`, `DNSPort`, netfilter kill switch). Requires `cap_add: [NET_ADMIN]`. |
+| `TORPROXY_API_TOKEN` | *(unset)* | Bearer token / API key securing REST API port `8080`. Recommended for production. |
+| `TORPROXY_GEOIP_AUTO_UPDATE` | `0` | Opt-in: periodically download and refresh Tor's GeoIP database from Tor Project GitLab. |
 
-All variables are strictly validated at startup. Port conflicts or out-of-range values trigger an immediate diagnostic failure. See [docs/configuration.md](docs/configuration.md) for full details.
-
-### GeoIP Auto-Update
-
-By default `torproxy` uses the Tor GeoIP database bundled with the Alpine Tor package (`/usr/share/tor/geoip{,6}`), which is only refreshed when the Docker image is rebuilt. To keep country routing (`TORPROXY_COUNTRY=DE`) on a fresh IP-to-country mapping, enable the opt-in auto-update:
-
-```sh
-TORPROXY_GEOIP_AUTO_UPDATE=1 TORPROXY_COUNTRY=DE docker compose up -d
-```
-
-With `TORPROXY_GEOIP_AUTO_UPDATE=1` the container downloads `geoip`/`geoip6` from Tor Project GitLab (HTTPS) at startup and then every `TORPROXY_GEOIP_UPDATE_INTERVAL` seconds (default `86400` = 24h), validates the format, installs the files atomically into `TORPROXY_GEOIP_DIR` (default `/var/lib/tor/geoip`), and sends Tor `SIGHUP` to reload them. If the download or validation fails (e.g. offline or upstream unavailable), the previously installed — or bundled — database keeps working, so an old version never breaks country routing. Each attempt is recorded and exposed additively as `geoip` in `/status`, so a silent fallback is visible. The pre-publish Live Image Verification gate checks that the GeoIP URLs are reachable and that a container with auto-update enabled downloads the database; the Daily Live Image Verification workflow repeats this as a drift detector. Additional settings: `TORPROXY_GEOIP_URL`, `TORPROXY_GEOIP6_URL`, `TORPROXY_GEOIP_MAX_BYTES`, `TORPROXY_GEOIP6_MAX_BYTES`.
+> 📖 **Full Configuration Reference:** See [docs/configuration.md](docs/configuration.md) for custom listening ports (`TORPROXY_LISTEN_PORT`, `TORPROXY_SOCKS_PORT`, `TORPROXY_API_PORT`), address binding rules, and GeoIP update parameters.
 
 ---
 
