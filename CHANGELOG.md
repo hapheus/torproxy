@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.7] — 2026-11-13
+
+### Fixed
+- **mcp**: Support standalone stdio MCP mode (`mcp` / `torproxy mcp`) directly in `docker/start.sh` with daemon logs routed to `stderr`, and remove `--entrypoint torproxy` from `.mcp.json`, `smithery.yaml`, and `docs/mcp.md` (#147, #148)
+
 ## [2.7.6] — 2026-11-12
 
 ### Changed
