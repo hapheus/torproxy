@@ -91,6 +91,10 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.7 (Standalone stdio MCP mode in container entrypoint)
+
+- **Standalone Stdio MCP Container Mode (#147, PR #148):** Updated `docker/start.sh` to detect `mcp` or `torproxy mcp` arguments, route setup/Tor/Privoxy logs to `stderr` while keeping `stdout` strictly for JSON-RPC, and launch `torproxy mcp` with Tor and Privoxy running in the background. Removed `--entrypoint torproxy` from `.mcp.json`, `smithery.yaml`, and `docs/mcp.md`.
+
 ### 2.7.6 (Developer Experience, Behavioral Psychology & Documentation Optimization)
 
 - **Documentation & DX Optimization (#144, #145):** Restructured `README.md`, `DOCKERHUB.md`, and `/docs` using developer psychology, cognitive load reduction (Hick's Law), and progressive disclosure. Added instant 2-step verification, zero-clone `docker run` quickstarts, honest boundaries ("When to use / when not to use"), explicit fail-closed guarantees, and rapid-navigation matrices across `docs/api.md` and `docs/configuration.md`.

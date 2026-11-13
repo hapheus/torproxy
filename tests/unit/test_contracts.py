@@ -342,8 +342,6 @@ class TestEnvironmentAndDefaultsContract:
             "run",
             "-i",
             "--rm",
-            "--entrypoint",
-            "torproxy",
             "hapheus/torproxy:latest",
             "mcp",
         ]
@@ -357,7 +355,14 @@ class TestEnvironmentAndDefaultsContract:
         assert "configSchema:" in smithery_content
         assert "commandFunction:" in smithery_content
         assert "hapheus/torproxy:latest" in smithery_content
-        assert "--entrypoint" in smithery_content
+        assert "--entrypoint" not in smithery_content
+
+    def test_start_script_supports_mcp_standalone_mode(self):
+        start_sh_path = os.path.join(DOCKER_DIR, "start.sh")
+        with open(start_sh_path, "r", encoding="utf-8") as f:
+            start_sh = f.read()
+        assert "torproxy mcp" in start_sh
+        assert "mcp" in start_sh
 
     def test_compiled_artifacts_ignored_everywhere(self):
         # ISSUE-16: no .pyc/__pycache__ may leak into the repo or the image.

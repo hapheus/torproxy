@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+mcp_mode=0
+if [ "${1:-}" = "mcp" ] || { [ "${1:-}" = "torproxy" ] && [ "${2:-}" = "mcp" ]; }; then
+  mcp_mode=1
+  # Preserve original stdout on FD 3 for JSON-RPC while routing all daemon logs to stderr.
+  exec 3>&1 1>&2
+fi
+
 validate_configuration() {
   python3 -m torproxy.runtime.configure --check
 }
@@ -38,6 +45,11 @@ su tor -s /bin/sh -c 'chmod 0750 /var/lib/tor' 2>/dev/null || true
 
 su privoxy -s /bin/sh -c 'exec privoxy --no-daemon /tmp/privoxy.config' &
 privoxy_pid=$!
+
+if [ "$mcp_mode" -eq 1 ]; then
+  su torproxy -s /bin/sh -c 'exec torproxy mcp' >&3 3>&-
+  exit $?
+fi
 
 su torproxy -s /bin/sh -c 'exec python3 -m torproxy' &
 api_pid=$!
