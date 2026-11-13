@@ -14,8 +14,6 @@ startCommand:
         "run",
         "-i",
         "--rm",
-        "--entrypoint",
-        "torproxy",
         ...(config?.torproxyApiToken ? ["-e", `TORPROXY_API_TOKEN=${config.torproxyApiToken}`] : []),
         "hapheus/torproxy:latest",
         "mcp"

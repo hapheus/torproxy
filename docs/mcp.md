@@ -81,7 +81,7 @@ The repository includes a root-level `.mcp.json` automatically detected by Curso
   "mcpServers": {
     "torproxy": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--entrypoint", "torproxy", "hapheus/torproxy:latest", "mcp"]
+      "args": ["run", "-i", "--rm", "hapheus/torproxy:latest", "mcp"]
     }
   }
 }

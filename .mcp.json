@@ -6,8 +6,6 @@
         "run",
         "-i",
         "--rm",
-        "--entrypoint",
-        "torproxy",
         "hapheus/torproxy:latest",
         "mcp"
       ]
