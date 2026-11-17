@@ -91,6 +91,14 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.9 (Single source of truth version synchronization)
+
+- **Version Synchronization:** Synchronized version `2.7.9` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md` following the dependency and base-image updates in `2.7.8`.
+
+### 2.7.8 (Base image, dependency, and CI updates)
+
+- **Container & Dependency Updates (#150, #151, #152):** Updated the `alpine:3.24` base image digest, bumped `ruff` to `0.17.5`, and updated `google/osv-scanner-action` to `2.7.1`.
+
 ### 2.7.7 (Standalone stdio MCP mode in container entrypoint)
 
 - **Standalone Stdio MCP Container Mode (#147, PR #148):** Updated `docker/start.sh` to detect `mcp` or `torproxy mcp` arguments, route setup/Tor/Privoxy logs to `stderr` while keeping `stdout` strictly for JSON-RPC, and launch `torproxy mcp` with Tor and Privoxy running in the background. Removed `--entrypoint torproxy` from `.mcp.json`, `smithery.yaml`, and `docs/mcp.md`.

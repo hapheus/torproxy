@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.9] — 2026-11-17
+
+### Changed
+- **release**: Synchronize version `2.7.9` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md`
+
+## [2.7.8] — 2026-11-17
+
+### Changed
+- **docker**: Bump `alpine:3.24` digest from `be26560` to `f59abe6` (#150)
+- **deps**: Bump `ruff` from `0.17.4` to `0.17.5` (#151)
+- **ci**: Bump `google/osv-scanner-action` from `2.7.0` to `2.7.1` (#152)
+
 ## [2.7.7] — 2026-11-13
 
 ### Fixed
@@ -253,7 +265,9 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.7...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.9...HEAD
+[2.7.9]: https://github.com/hapheus/torproxy/compare/v2.7.8...v2.7.9
+[2.7.8]: https://github.com/hapheus/torproxy/compare/v2.7.7...v2.7.8
 [2.7.7]: https://github.com/hapheus/torproxy/compare/v2.7.6...v2.7.7
 [2.7.6]: https://github.com/hapheus/torproxy/compare/v2.7.5...v2.7.6
 [2.7.5]: https://github.com/hapheus/torproxy/compare/v2.7.4...v2.7.5
