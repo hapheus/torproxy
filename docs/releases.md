@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.10 (Dependency and GitHub Actions updates)
+
+- **Dependency & CI Updates (#154, #155):** Bumped `pyyaml` to `6.0.4` and `ruff` to `0.17.6`, and updated GitHub Actions (`github/codeql-action` to `4.39.4`, `astral-sh/setup-uv` to `10.4.0`, `ossf/scorecard-action` to `2.6.0`).
+- **Version Synchronization:** Synchronized version `2.7.10` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md`.
+
 ### 2.7.9 (Single source of truth version synchronization)
 
 - **Version Synchronization:** Synchronized version `2.7.9` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md` following the dependency and base-image updates in `2.7.8`.

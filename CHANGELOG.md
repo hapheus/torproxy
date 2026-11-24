@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.10] — 2026-11-24
+
+### Changed
+- **deps**: Bump `pyyaml` from `6.0.3` to `6.0.4` and `ruff` from `0.17.5` to `0.17.6` (#154)
+- **ci**: Bump `github/codeql-action` (`4.39.3` -> `4.39.4`), `astral-sh/setup-uv` (`10.3.3` -> `10.4.0`), and `ossf/scorecard-action` (`2.5.0` -> `2.6.0`) (#155)
+- **release**: Synchronize version `2.7.10` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md`
+
 ## [2.7.9] — 2026-11-17
 
 ### Changed
@@ -265,7 +272,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.9...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.10...HEAD
+[2.7.10]: https://github.com/hapheus/torproxy/compare/v2.7.9...v2.7.10
 [2.7.9]: https://github.com/hapheus/torproxy/compare/v2.7.8...v2.7.9
 [2.7.8]: https://github.com/hapheus/torproxy/compare/v2.7.7...v2.7.8
 [2.7.7]: https://github.com/hapheus/torproxy/compare/v2.7.6...v2.7.7
