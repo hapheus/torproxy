@@ -91,6 +91,11 @@ If an upgraded image exhibits unexpected behavior in your environment:
 
 ## 6. Release Notes
 
+### 2.7.11 (Scorecard workflow fix)
+
+- **CI Fix (#157):** Pinned `ossf/scorecard-action` back to `v2.5.0` (`fa7117db83c52d787ae5a89f350999701505d78e`) in `.github/workflows/scorecard.yml` because `v2.6.0` fails to pull `ghcr.io/ossf/scorecard-action:v2.6.0` (upstream missing manifest `404`).
+- **Version Synchronization:** Synchronized version `2.7.11` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md`.
+
 ### 2.7.10 (Dependency and GitHub Actions updates)
 
 - **Dependency & CI Updates (#154, #155):** Bumped `pyyaml` to `6.0.4` and `ruff` to `0.17.6`, and updated GitHub Actions (`github/codeql-action` to `4.39.4`, `astral-sh/setup-uv` to `10.4.0`, `ossf/scorecard-action` to `2.6.0`).

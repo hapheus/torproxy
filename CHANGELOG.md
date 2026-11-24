@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.11] — 2026-11-24
+
+### Fixed
+- **ci**: Pin `ossf/scorecard-action` back to `v2.5.0` (`fa7117db83c52d787ae5a89f350999701505d78e`) in `.github/workflows/scorecard.yml` to resolve broken `v2.6.0` container manifest pull (`404 Not Found`) (#157)
+
+### Changed
+- **release**: Synchronize version `2.7.11` across `pyproject.toml`, `docker/Dockerfile`, `server.json`, `uv.lock`, `docs/releases.md`, and `CHANGELOG.md`
+
 ## [2.7.10] — 2026-11-24
 
 ### Changed
@@ -272,7 +280,8 @@ Sprint 1 security & contract correctness release.
 
 ---
 
-[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.10...HEAD
+[Unreleased]: https://github.com/hapheus/torproxy/compare/v2.7.11...HEAD
+[2.7.11]: https://github.com/hapheus/torproxy/compare/v2.7.10...v2.7.11
 [2.7.10]: https://github.com/hapheus/torproxy/compare/v2.7.9...v2.7.10
 [2.7.9]: https://github.com/hapheus/torproxy/compare/v2.7.8...v2.7.9
 [2.7.8]: https://github.com/hapheus/torproxy/compare/v2.7.7...v2.7.8
